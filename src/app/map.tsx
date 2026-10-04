@@ -3,7 +3,7 @@ import { Button, Linking, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 
-const GOOGLE_MAPS_API_KEY = 'API_KEY_HERE';
+const GOOGLE_MAPS_API_KEY = 'API_KEY_HERE2';
 
 // coordinate structure
 interface LocationCoordinates {
