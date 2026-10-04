@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 
@@ -78,19 +78,38 @@ export default function App() {
 
 
   // function to share same coordinates with external launch
-  const shareWithExternalMap = () => {
-    const { origin, destination } = currentRoute;
+const shareWithExternalMap = () => {
+  const { origin, destination } = currentRoute;
 
-    if (!origin) {
-      Alert.alert("Please wait", "Still obtaining your current location.");
-      return;
-    }
+  if (!origin) {
+    Alert.alert("Please wait", "Still obtaining your current location.");
+    return;
+  }
 
-    const url = `https://google.com{origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&travelmode=driving`;
+  // Define cross platform native map endpoints
+  const iosUrl = `maps://0,0?saddr=${origin.latitude},${origin.longitude}&daddr=${destination.latitude},${destination.longitude}&dirflg=d`;
+  const androidUrl = `google.navigation:q=${destination.latitude},${destination.longitude}&mode=d`;
 
-    // launch external map from URL
-    Linking.openURL(url).catch(err => console.error("An error occurred", err));
-  };
+  // Select the correct string depending on platform
+  const url = Platform.select({
+    ios: iosUrl,
+    android: androidUrl,
+    default: androidUrl // Fallback
+  });
+
+  // Launch the native directions protocol
+  Linking.canOpenURL(url)
+    .then((supported) => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        // Fallback to web link 
+        const webUrl = `https://google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&travelmode=driving`;
+        Linking.openURL(webUrl);
+      }
+    })
+    .catch((err) => console.error("An error occurred", err));
+};
 
   // handle layout rendering so UI doesn't break if origin is null
   if (loading || !currentRoute.origin) {
@@ -117,7 +136,7 @@ export default function App() {
         <MapViewDirections
           origin={currentRoute.origin}
           destination={currentRoute.destination}
-          apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""}
+          apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
           strokeWidth={4}
           strokeColor="blue"
         />
