@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 
@@ -11,6 +11,10 @@ interface LocationCoordinates {
   latitude: number;
   longitude: number;
   name: string;
+  // keep track of stuff rest stop has
+  highway?: string;
+  direction?: string;
+  amenities?: string;
 }
 
 // container structure for coordinates
@@ -22,62 +26,49 @@ interface RouteContainer {
 export default function App() {
   // track which destination pin is selected
   const [selectedDestination, setSelectedDestination] = useState<LocationCoordinates | null>(null);
-  // store coordinates in a single variable
+ 
+  // init animation value for map opacity
+  const [mapOpacity] = useState(new Animated.Value(0)); 
+
+  // init empty array variable
   const [currentRoute, setCurrentRoute] = useState<RouteContainer>({
     origin: null,
-    destinations: [
-      {
-        id: '1',
-        latitude: 32.5191,
-        longitude: -102.6121,
-        name: 'Andrews County Northbound, TX',
-      },
-      {
-        id: '2',
-        latitude: 30.2117,
-        longitude: -97.7971,
-        name: 'Garrison Park, Austin, TX',
-      },
-      {
-        id: '3',
-        latitude: 30.2672,
-        longitude: -97.7431,
-        name: 'Downtown Austin, TX',
-      },
-    ],
+    destinations: [],
   });
 
   const [loading, setLoading] = useState<boolean>(true);
-
-  // trigger gps tracking on launch
-  useEffect(() => {
-    getUserLiveLocation();
-  }, []);
+  // loading for database state
+  const [loadingDatabase, setLoadingDatabase] = useState<boolean>(true);
 
   const getUserLiveLocation = async () => {
-    setLoading(true);
-
-    //request permissions and get user location
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert("Permission Denied", "Using downtown Austin placeholder.");
-
-      //fallback if not authorized
-      setCurrentRoute(prev => ({
-        ...prev,
-        origin: { id: 'default', latitude: 30.2672, longitude: -97.7431, name: "Downtown Austin, TX" }
-      }));
-      setLoading(false);
-      return;
-    }
-
     try {
-      // get device coordinates
-      let location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission Denied", "Using downtown Austin placeholder.");
+        setCurrentRoute(prev => ({
+          ...prev,
+          origin: { id: 'default', latitude: 30.2672, longitude: -97.7431, name: "Downtown Austin, TX" }
+        }));
+        return;
+      }
 
-      // update origin nested inside existing variable structure
+      // Create a racing promise that automatically fails after 3 seconds
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("GPS Hardware Timeout")), 3000)
+      );
+
+      // Race the actual hardware fetch against our 3-second limit
+      const locationPromise = (async () => {
+        let loc = await Location.getLastKnownPositionAsync({});
+        if (!loc) {
+          loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        }
+        return loc;
+      })();
+
+      // Whichever finishes first wins the race!
+      const location = (await Promise.race([locationPromise, timeoutPromise])) as Location.LocationObject;
+
       setCurrentRoute(prev => ({
         ...prev,
         origin: {
@@ -88,13 +79,62 @@ export default function App() {
         }
       }));
     } catch (error) {
-      Alert.alert("Error", "Could not retrieve live location.");
-    } finally {
-      setLoading(false);
+      console.warn("GPS failed or timed out. Falling back to Austin placeholder.", error);
+      // HARD FALLBACK: Instantly insert fallback coordinate variables so the thread continues
+      setCurrentRoute(prev => ({
+        ...prev,
+        origin: { id: 'default', latitude: 30.2672, longitude: -97.7431, name: "Downtown Austin, TX" }
+      }));
     }
   };
 
+  
 
+  //pulls permanent pins from database
+  const loadPinsFromCustomDatabase = async () => {
+    setLoadingDatabase(true);
+    try {
+      // REPLACE LATER WITH ACTUAL DATABASE CALL
+      // const data = await response.json();
+      // const response = await fetch('https://database-endpoint.com');
+
+      // simulation of fast cloud response delay
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      const databaseResponse: LocationCoordinates[] = [
+        {
+          id: '1',
+          latitude: 32.5191,
+          longitude: -102.6121,
+          name: 'Andrews County Northbound, TX',
+        },
+        {
+          id: '2',
+          latitude: 30.2117,
+          longitude: -97.7971,
+          name: 'Garrison Park, Austin, TX',
+        },
+        {
+          id: '3',
+          latitude: 30.2672,
+          longitude: -97.7431,
+          name: 'Downtown Austin, TX',
+        },
+      ];
+
+      // update destinations inside central container variable
+      setCurrentRoute(prev => ({
+        ...prev,
+        destinations: databaseResponse
+      }));
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Database Error", "Failed to load database");
+    } finally {
+      setLoadingDatabase(false);
+    }
+
+    };
 
   // function to share same coordinates with external launch
 const shareWithExternalMap = () => {
@@ -135,17 +175,47 @@ const shareWithExternalMap = () => {
     .catch((err) => console.error("An error occurred", err));
 };
 
+// init gps tracking and database on launch
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        setLoading(true);
+        console.log("1. Starting GPS Tracking...");
+        await getUserLiveLocation();
+        
+        console.log("2. Starting Database Sync...");
+        await loadPinsFromCustomDatabase();
+        Animated.timing(mapOpacity, {
+          toValue: 1,
+          duration: 600,
+          // enable Hardware acceleration
+          useNativeDriver: true,
+        }).start();
+
+      } catch (error) {
+        console.error("An initialization step failed unexpectedly:", error);
+      } finally {
+        setLoading(false);
+        console.log("3. App Loaded successfully.");
+      }
+    };
+    initializeApp();
+  }, []);
+
   // handle layout rendering so UI doesn't break if origin is null
   if (loading || !currentRoute.origin) {
     return (
       <View style={styles.center}>
-        <Text>Fetching User Location...</Text>
+        <ActivityIndicator size="large" color="blue" />
+        <Text style={{ marginTop: 10}}>Configuring Navigation Environment...</Text>
       </View>
     );
   }
+  
+
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: mapOpacity }]}>
       {/* Render map using coordinates stored from variable */}
       <MapView style={styles.map} provider={PROVIDER_GOOGLE} initialRegion={{
         latitude: currentRoute.origin?.latitude || 30.2672,
@@ -174,7 +244,8 @@ const shareWithExternalMap = () => {
           <MapViewDirections
             origin={currentRoute.origin}
             destination={selectedDestination}
-            apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
+            apikey="AIzaSyDkmgwVRqBt0H1AWN9XXYTcpmoyj8NQGcY"
+            //apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
             strokeWidth={4}
             strokeColor="blue"
           />
@@ -183,13 +254,20 @@ const shareWithExternalMap = () => {
 
       {/* Button to interact with coordinate variables */}
       <View style={styles.buttonContainer}>
-        <Button
-        title={selectedDestination ? `Navigate to ${selectedDestination.name}` : "Tap a pin to begin"}
-        disabled={!selectedDestination}
-        onPress={shareWithExternalMap}
-        />
+        {loadingDatabase ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+            <ActivityIndicator size="small" color="blue" />
+            <Text>Synchronizing Database...</Text>
+            </View>
+        ) : (
+          <Button
+            title={selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
+            disabled={!selectedDestination}
+            onPress={shareWithExternalMap}
+          />
+        )}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
