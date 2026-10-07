@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
+import { supabase } from './supabase';
 
 
 // coordinate structure
@@ -39,6 +40,9 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   // loading for database state
   const [loadingDatabase, setLoadingDatabase] = useState<boolean>(true);
+
+  // ev mode toggle
+  const [showOnlyEV, setShowOnlyEV] = useState<boolean>(false);
 
   const getUserLiveLocation = async () => {
     try {
@@ -98,7 +102,36 @@ export default function App() {
       // const data = await response.json();
       // const response = await fetch('https://database-endpoint.com');
 
+      // add live supabase table to query
+      const { data, error } = await supabase
+        .from('rest_stops')
+        .select('id, name, latitude, longitude, highway, direction, amenities');
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        // map PostgreSQL into frontend
+        const formattedStops: LocationCoordinates[] = data.map((stop) => ({
+          id: stop.id.toString(),
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          name: stop.name,
+          highway: stop.highway,
+          direction: stop.direction,
+          amenities: stop.amenities,
+        }));
+
+        // sync central state variable
+        setCurrentRoute((prev) => ({
+          ...prev,
+          destinations: formattedStops,
+        }));
+      }
+
       // simulation of fast cloud response delay
+      /*
       await new Promise(resolve => setTimeout(resolve, 10000));
 
       const databaseResponse: LocationCoordinates[] = [
@@ -121,12 +154,9 @@ export default function App() {
           name: 'Downtown Austin, TX',
         },
       ];
+      */
 
-      // update destinations inside central container variable
-      setCurrentRoute(prev => ({
-        ...prev,
-        destinations: databaseResponse
-      }));
+      // error catching
     } catch (error) {
       console.error(error);
       Alert.alert("Database Error", "Failed to load database");
@@ -177,6 +207,7 @@ const shareWithExternalMap = () => {
 
 // init gps tracking and database on launch
   useEffect(() => {
+    const timer = setTimeout(() => {
     const initializeApp = async () => {
       try {
         setLoading(true);
@@ -200,6 +231,11 @@ const shareWithExternalMap = () => {
       }
     };
     initializeApp();
+
+  }, 0); // 0ms delay to defer execution
+
+  // clean out timer context
+  return () => clearTimeout(timer);
   }, []);
 
   // handle layout rendering so UI doesn't break if origin is null
@@ -212,7 +248,9 @@ const shareWithExternalMap = () => {
     );
   }
   
-
+  const displayedPins = showOnlyEV
+    ? currentRoute.destinations.filter(pin => pin.amenities?.includes('ev_charging'))
+    : currentRoute.destinations;
 
   return (
     <Animated.View style={[styles.container, { opacity: mapOpacity }]}>
@@ -229,7 +267,7 @@ const shareWithExternalMap = () => {
         )}
 
         {/* Loop through destinations and render pins onto screen */}
-        {currentRoute.destinations.map((pin) => (
+        {displayedPins.map((pin) => (
           <Marker
             key={pin.id} // creates unique key for each pin to save performance
             coordinate={pin}
@@ -251,6 +289,16 @@ const shareWithExternalMap = () => {
           />
         )}
       </MapView>
+
+      {/* Button to toggle filter on/off */}
+      <View style={styles.filterContainer}>
+        <Button
+          title={showOnlyEV ? "Showing EV Charging Only" : "Filter: All Rest Stops"}
+          color={showOnlyEV ? "green" : "#666"}
+          // toggles button on/off
+          onPress= {() => setShowOnlyEV(!showOnlyEV)}
+          />
+      </View>
 
       {/* Button to interact with coordinate variables */}
       <View style={styles.buttonContainer}>
@@ -289,5 +337,19 @@ const styles = StyleSheet.create({
     borderRadius: 8
   },
   center: {
-    flex: 1, justifyContent: 'center', alignItems:'center' }
+    flex: 1, justifyContent: 'center', alignItems:'center' },
+
+  filterContainer: {
+    position: 'absolute',
+    top: 50, //floats on top of screen layer
+    left: 20,
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 5,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
 });
