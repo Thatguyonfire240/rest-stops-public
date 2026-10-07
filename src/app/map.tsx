@@ -282,8 +282,7 @@ const shareWithExternalMap = () => {
           <MapViewDirections
             origin={currentRoute.origin}
             destination={selectedDestination}
-            apikey="AIzaSyDkmgwVRqBt0H1AWN9XXYTcpmoyj8NQGcY"
-            //apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
+            apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
             strokeWidth={4}
             strokeColor="blue"
           />
