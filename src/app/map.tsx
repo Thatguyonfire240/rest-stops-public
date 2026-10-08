@@ -15,7 +15,7 @@ interface LocationCoordinates {
   // keep track of stuff rest stop has
   highway?: string;
   direction?: string;
-  amenities?: string;
+  amenities?: string[];
 }
 
 // container structure for coordinates
@@ -193,6 +193,24 @@ export default function App() {
       return `${hours} hr${hours > 1 ? 's' : ''} ${remainingMinutes} mins`;
     };
 
+    // turn database amenity string array into visual icons (emoji)
+    const renderAmenityIcons = (amenitiesList?: string[]) => {
+      if (!amenitiesList || amenitiesList.length === 0) return null;
+
+      // map strings from database directly to emoji output
+      return amenitiesList.map((amenityId) => {
+        switch (amenityId) {
+          case 'restrooms': return '🚽';
+          case 'vending': return '🍔';
+          case 'pet_area': return '🐕';
+          case 'wifi': return '📶';
+          case 'ev_charging': return '⚡';
+          default: return '📍';
+        }
+      // separate icons by two space cushion
+      }).join('  ');
+    };
+
   // function to share same coordinates with external launch
 const shareWithExternalMap = () => {
   const { origin } = currentRoute;
@@ -320,7 +338,16 @@ const shareWithExternalMap = () => {
                 {pin.highway && (
                   <View style={styles.calloutBadgeRow}>
                     <Text style={styles.calloutBadgeText}>
-                      {pin.highway} {pin.direction ? `• ${pin.direction}` : ''}
+                      🌎 {pin.highway} {pin.direction ? `• ${pin.direction}` : ''}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Render amenity icons if present */}
+                {pin.amenities && pin.amenities.length > 0 && (
+                  <View style={styles.amenityRow}>
+                    <Text style={styles.amenityText}>
+                      {renderAmenityIcons(pin.amenities)}
                     </Text>
                   </View>
                 )}
@@ -511,5 +538,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#1A53A0',
+  },
+
+  amenityRow: {
+    marginTop: 6,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    width: '100%',
+  },
+
+  amenityText: {
+    fontSize: 14,
+    letterSpacing: 2, // keeps icons uniform and decluttered
   },
 });
