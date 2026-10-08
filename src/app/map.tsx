@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
-import { supabase } from './supabase';
+import { supabase } from '../../services/supabase';
 
 
 // coordinate structure
@@ -43,6 +43,9 @@ export default function App() {
 
   // ev mode toggle
   const [showOnlyEV, setShowOnlyEV] = useState<boolean>(false);
+
+  // route stats
+  const [routeStats, setRouteStats] = useState<{ distance: number; duration: number } | null>(null);
 
   const getUserLiveLocation = async () => {
     try {
@@ -111,9 +114,12 @@ export default function App() {
         throw error;
       }
 
+      // debug
+      console.log("Supabase Connection Sucessful! data:", data);
+
       if (data) {
         // map PostgreSQL into frontend
-        const formattedStops: LocationCoordinates[] = data.map((stop) => ({
+        const formattedStops: LocationCoordinates[] = data.map((stop : any) => ({
           id: stop.id.toString(),
           latitude: stop.latitude,
           longitude: stop.longitude,
@@ -164,6 +170,24 @@ export default function App() {
       setLoadingDatabase(false);
     }
 
+    };
+
+    //  extended math for destination formats raw data into minutes and hours
+    const formatDuration = (rawMinutes: number) => {
+      const totalMinutes = Math.round(rawMinutes);
+
+      if (totalMinutes < 60) {
+        return `${totalMinutes} mins`
+      }
+
+      const hours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+
+      if (remainingMinutes === 0) {
+        return `${hours} hr${hours > 1 ? 's' : ''}`;
+      }
+
+      return `${hours} hr${hours > 1 ? 's' : ''} ${remainingMinutes} mins`;
     };
 
   // function to share same coordinates with external launch
@@ -247,15 +271,21 @@ const shareWithExternalMap = () => {
       </View>
     );
   }
-  
+
   const displayedPins = showOnlyEV
     ? currentRoute.destinations.filter(pin => pin.amenities?.includes('ev_charging'))
     : currentRoute.destinations;
+    
 
   return (
     <Animated.View style={[styles.container, { opacity: mapOpacity }]}>
       {/* Render map using coordinates stored from variable */}
-      <MapView style={styles.map} provider={PROVIDER_GOOGLE} initialRegion={{
+      <MapView 
+      // re renders whenever pin count changes
+      key={`map-canvas-${displayedPins.length}`} 
+      style={styles.map} 
+      provider={PROVIDER_GOOGLE} 
+      initialRegion={{
         latitude: currentRoute.origin?.latitude || 30.2672,
         longitude: currentRoute.origin?.longitude || -97.7431,
         latitudeDelta: 0.422,
@@ -273,7 +303,10 @@ const shareWithExternalMap = () => {
             coordinate={pin}
             title={pin.name}
             pinColor={selectedDestination?.id === pin.id ? "green" : "blue"} //highlights green if selected, otherwise default to blue
-            onPress={() => setSelectedDestination(pin)} // sets selected pin to state variable
+            onPress={() => {
+              setRouteStats(null); 
+              setSelectedDestination(pin); // sets selected pin to state variable
+            }}
           />
         ))}
 
@@ -285,6 +318,18 @@ const shareWithExternalMap = () => {
             apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
             strokeWidth={4}
             strokeColor="blue"
+
+            // listen for calculation response
+            onReady={(result) => {
+              setRouteStats({
+                // convert kilometers to freedom units
+                distance: result.distance * 0.621372,
+                duration: result.duration // minutes
+              });
+            }}
+            onError={(errorMessage) => {
+              console.error("Directions Error: ", errorMessage);
+            }}
           />
         )}
       </MapView>
@@ -299,6 +344,21 @@ const shareWithExternalMap = () => {
           />
       </View>
 
+      {/* Button to clear route */}
+      {selectedDestination && (
+        <View style={styles.clearRouteContainer}>
+          <Button
+            title="Clear Selected Route"
+            color="#d9534f"
+            // deselect pin and remove mileage/eta
+            onPress={() => {
+              setSelectedDestination(null);
+              setRouteStats(null);
+            }}
+          />
+        </View>
+      )}
+
       {/* Button to interact with coordinate variables */}
       <View style={styles.buttonContainer}>
         {loadingDatabase ? (
@@ -307,11 +367,20 @@ const shareWithExternalMap = () => {
             <Text>Synchronizing Database...</Text>
             </View>
         ) : (
+          <View style={{ width: '100%', gap: 10 }}>
+            {/* displays live calculation when pin route is generated */}
+            {routeStats && (
+              <View style={styles.statsRow}>
+                <Text style={styles.statsText}> {routeStats.distance.toFixed(1)} miles</Text>
+                <Text style={styles.statsText}> {formatDuration(routeStats.duration)}</Text>
+                </View>
+            )}
           <Button
             title={selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
             disabled={!selectedDestination}
             onPress={shareWithExternalMap}
           />
+          </View>
         )}
       </View>
     </Animated.View>
@@ -341,6 +410,36 @@ const styles = StyleSheet.create({
   filterContainer: {
     position: 'absolute',
     top: 50, //floats on top of screen layer
+    left: 20,
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 5,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 4,
+  },
+
+  statsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+
+  clearRouteContainer: {
+    position: 'absolute',
+    top: 105, // float right below ev charging filter, change later to move ev filter to settings menu
     left: 20,
     right: 20,
     backgroundColor: 'white',
