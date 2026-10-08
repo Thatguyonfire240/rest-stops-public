@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
@@ -46,6 +46,9 @@ export default function App() {
 
   // route stats
   const [routeStats, setRouteStats] = useState<{ distance: number; duration: number } | null>(null);
+
+  // update map reference
+  const mapRef = useRef<MapView | null>(null);
 
   const getUserLiveLocation = async () => {
     try {
@@ -280,7 +283,9 @@ const shareWithExternalMap = () => {
   return (
     <Animated.View style={[styles.container, { opacity: mapOpacity }]}>
       {/* Render map using coordinates stored from variable */}
-      <MapView 
+      <MapView
+      // binds map to reference handle
+      ref={mapRef} 
       // re renders whenever pin count changes
       key={`map-canvas-${displayedPins.length}`} 
       style={styles.map} 
@@ -326,6 +331,19 @@ const shareWithExternalMap = () => {
                 distance: result.distance * 0.621372,
                 duration: result.duration // minutes
               });
+
+              // make camera frame the route coordinates dynamically
+              if (mapRef.current) {
+                mapRef.current.fitToCoordinates(result.coordinates, {
+                  edgePadding: {
+                    top: 140, //extra padding up top to clear buttons
+                    right: 50,
+                    bottom: 160, // extra padding on bottom to clear summary card
+                    left: 50,
+                  },
+                  animated: true, // smooth zoom animation
+                });
+              }
             }}
             onError={(errorMessage) => {
               console.error("Directions Error: ", errorMessage);
