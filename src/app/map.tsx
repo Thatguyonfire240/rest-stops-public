@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { supabase } from '../../services/supabase';
 
@@ -306,13 +306,27 @@ const shareWithExternalMap = () => {
           <Marker
             key={pin.id} // creates unique key for each pin to save performance
             coordinate={pin}
-            title={pin.name}
             pinColor={selectedDestination?.id === pin.id ? "green" : "blue"} //highlights green if selected, otherwise default to blue
             onPress={() => {
               setRouteStats(null); 
               setSelectedDestination(pin); // sets selected pin to state variable
             }}
-          />
+          >
+            <Callout tooltip={false}>
+              <View style={styles.calloutBubble}>
+                <Text style={styles.calloutTitle}>{pin.name}</Text>
+
+                {/* checks database for highway badge */}
+                {pin.highway && (
+                  <View style={styles.calloutBadgeRow}>
+                    <Text style={styles.calloutBadgeText}>
+                      {pin.highway} {pin.direction ? `• ${pin.direction}` : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Callout>
+          </Marker>
         ))}
 
         {/* calculate and show directions if user has selected a destination pin */}
@@ -336,10 +350,10 @@ const shareWithExternalMap = () => {
               if (mapRef.current) {
                 mapRef.current.fitToCoordinates(result.coordinates, {
                   edgePadding: {
-                    top: 140, //extra padding up top to clear buttons
-                    right: 50,
+                    top: 340, //extra padding to clear buttons
+                    right: 120,
                     bottom: 160, // extra padding on bottom to clear summary card
-                    left: 50,
+                    left: 120,
                   },
                   animated: true, // smooth zoom animation
                 });
@@ -467,5 +481,35 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 3,
+  },
+
+  calloutBubble: {
+    padding: 8,
+    maxWidth: 200,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    alignItems: 'flex-start',
+  },
+
+  calloutTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+
+  calloutBadgeRow: {
+    backgroundColor: '#F0F4F8',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#D0DDF0',
+  },
+
+  calloutBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1A53A0',
   },
 });
