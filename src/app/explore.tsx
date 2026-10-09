@@ -17,6 +17,7 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFilters } from './_layout';
 
 export default function TabTwoScreen() {
   const safeAreaInsets = useSafeAreaInsets();
@@ -47,6 +48,23 @@ export default function TabTwoScreen() {
 
   // placeholder for database auth later for user login
   const userLoggedIn = false;
+
+  // import switch states
+  const { 
+    showOnlyEv, setShowOnlyEv,
+    avoidTolls, setAvoidTolls,
+    showTrafficData, setShowTrafficData,
+    showOnlyWifi, setShowOnlyWifi,
+    setSelectedDestination,
+    setRouteStats
+   } = useFilters();
+
+   const handlePreferenceChange = (stateSetter: (value: boolean) => void, currentVal: boolean) => {
+    setSelectedDestination(null);
+    setRouteStats(null);
+    stateSetter(!currentVal);
+   };
+
 
   const handleAccountAction = () => {
     if (userLoggedIn) {
@@ -81,14 +99,76 @@ export default function TabTwoScreen() {
       {/* Navigation Settings */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Navigation Settings</Text>
+
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Avoid Toll Roads</Text>
-          <Switch value={false} onValueChange={() => {}} />
+          <Text style={styles.rowLabel}>⚡ Show Only EV Charging Stops</Text>
+          <Switch
+            value={showOnlyEv}
+            onValueChange={() => handlePreferenceChange(setShowOnlyEv, showOnlyEv)}
+            /*
+            onValueChange={(newValue) => {
+              setSelectedDestination(null);
+              setRouteStats(null);
+              setShowOnlyEv(newValue);
+            }} 
+              */
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={showOnlyEv ? '#1A53A0' : '#f4f3f4'}
+          />
         </View>
+
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Display Real-time Active Traffic</Text>
-          <Switch value={true} onValueChange={() => {}} />
+          <Text style={styles.rowLabel}>📶 Show Only Stops With Wifi</Text>
+          <Switch
+            value={showOnlyWifi}
+            onValueChange={() => handlePreferenceChange(setShowOnlyWifi, showOnlyWifi)}
+            /*
+            onValueChange={(newValue) => {
+              setSelectedDestination(null);
+              setRouteStats(null);
+              setShowOnlyWifi(newValue);
+            }}
+            */
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={showOnlyWifi ? '#1A53A0' : '#f4f3f4'}
+          />
         </View>
+
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>🛣️ Avoid Toll Roads</Text>
+          <Switch
+            value={avoidTolls}
+            onValueChange={() => handlePreferenceChange(setAvoidTolls, avoidTolls)}
+            /*
+            onValueChange={(newValue) => {
+              setSelectedDestination(null);
+              setRouteStats(null);
+              setAvoidTolls(newValue);
+            }}
+            */
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={avoidTolls ? '#1A53A0' : '#f4f3f4'}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>🚗 Display Real-time Active Traffic</Text>
+          <Switch
+            value={showTrafficData}
+            onValueChange={() => handlePreferenceChange(setShowTrafficData, showTrafficData)}
+            /*
+            onValueChange={(newValue) => {
+              setSelectedDestination(null);
+              setRouteStats(null);
+              setShowTrafficData(newValue);
+            }}
+            */
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={showTrafficData ? '#1A53A0' : '#f4f3f4'}
+          />
+        </View>
+
+        
       </View>
 
 

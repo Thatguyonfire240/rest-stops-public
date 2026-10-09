@@ -1,9 +1,12 @@
 import * as Location from 'expo-location';
+import { useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
+import { useFilters } from './_layout';
 
 
 // coordinate structure
@@ -25,8 +28,8 @@ interface RouteContainer {
 }
 
 export default function App() {
-  // track which destination pin is selected
-  const [selectedDestination, setSelectedDestination] = useState<LocationCoordinates | null>(null);
+
+  const safeAreaInsets = useSafeAreaInsets();
  
   // init animation value for map opacity
   const [mapOpacity] = useState(new Animated.Value(0)); 
@@ -40,15 +43,38 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   // loading for database state
   const [loadingDatabase, setLoadingDatabase] = useState<boolean>(true);
-
+/*
   // ev mode toggle
   const [showOnlyEV, setShowOnlyEV] = useState<boolean>(false);
-
+*/
+  
+/*
   // route stats
   const [routeStats, setRouteStats] = useState<{ distance: number; duration: number } | null>(null);
+  */
 
   // update map reference
   const mapRef = useRef<MapView | null>(null);
+
+  // import switch states
+  const {
+    showOnlyEv,
+    avoidTolls,
+    showTrafficData,
+    showOnlyWifi,
+    selectedDestination,
+    setSelectedDestination,
+    routeStats,
+    setRouteStats
+  } = useFilters();
+
+/*
+  useEffect(() => {
+    setSelectedDestination(null);
+    setRouteStats(null);
+  }, [showOnlyEv, avoidTolls, showTrafficData, showOnlyWifi]);
+
+  */
 
   const getUserLiveLocation = async () => {
     try {
@@ -98,7 +124,16 @@ export default function App() {
     }
   };
 
-  
+  const navigation = useNavigation();
+
+  useEffect (() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      setSelectedDestination(null);
+      setRouteStats(null);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   //pulls permanent pins from database
   const loadPinsFromCustomDatabase = async () => {
@@ -293,9 +328,25 @@ const shareWithExternalMap = () => {
     );
   }
 
-  const displayedPins = showOnlyEV
-    ? currentRoute.destinations.filter(pin => pin.amenities?.includes('ev_charging'))
-    : currentRoute.destinations;
+  const displayedPins = currentRoute.destinations.filter((pin) => {
+    // check Ev charging preferences
+    if (showOnlyEv && !pin.amenities?.includes('ev_charging')) {
+      return false; // hide pin if user requests Ev only but stop does not have it
+    }
+
+    // check toll road avoidance preferences
+    if (avoidTolls && pin.highway?.toLowerCase().includes('toll')) {
+      return false; // hide pin if avoiding toll roads
+    }
+
+    // check for wifi
+    if (showOnlyWifi && !pin.amenities?.includes('wifi')) {
+      return false;
+    }
+
+    // when rest stop clears all checks, display
+    return true;
+  });
     
 
   return (
@@ -305,14 +356,17 @@ const shareWithExternalMap = () => {
       // binds map to reference handle
       ref={mapRef} 
       // re renders whenever pin count changes
-      key={`map-canvas-${displayedPins.length}`} 
+      key={`map-canvas-${displayedPins.length}-${avoidTolls}-${showTrafficData}`} 
       style={styles.map} 
       provider={PROVIDER_GOOGLE} 
       initialRegion={{
         latitude: currentRoute.origin?.latitude || 30.2672,
         longitude: currentRoute.origin?.longitude || -97.7431,
         latitudeDelta: 0.422,
-        longitudeDelta: 0.368,}} showsUserLocation={true} showsIndoors={false} showsTraffic={true}
+        longitudeDelta: 0.368,}} 
+        showsUserLocation={true} 
+        showsIndoors={false} 
+        showsTraffic={showTrafficData}
       >
         {/* render physical pins from state variable */}
         {currentRoute.origin && (
@@ -365,6 +419,13 @@ const shareWithExternalMap = () => {
             strokeWidth={4}
             strokeColor="blue"
 
+            // tells google directions to actively recalculate when settings change
+            mode="DRIVING"
+            optimizeWaypoints={true}
+            {...(avoidTolls ? { avoid: ['tolls'] as any } : {})}
+
+           
+
             // listen for calculation response
             onReady={(result) => {
               setRouteStats({
@@ -393,7 +454,8 @@ const shareWithExternalMap = () => {
         )}
       </MapView>
 
-      {/* Button to toggle filter on/off */}
+{/*
+      {/* Button to toggle filter on/off }
       <View style={styles.filterContainer}>
         <Button
           title={showOnlyEV ? "Showing EV Charging Only" : "Filter: All Rest Stops"}
@@ -402,43 +464,61 @@ const shareWithExternalMap = () => {
           onPress= {() => setShowOnlyEV(!showOnlyEV)}
           />
       </View>
+      */}
 
       {/* Button to clear route */}
       {selectedDestination && (
-        <View style={styles.clearRouteContainer}>
-          <Button
-            title="Clear Selected Route"
-            color="#d9534f"
+        <View style={[
+          styles.clearRouteWrapper,
+          { top: safeAreaInsets.top + 12 }
+          ]}>
+          <TouchableOpacity
+            style={styles.floatingActionCloseCircle}
             // deselect pin and remove mileage/eta
             onPress={() => {
               setSelectedDestination(null);
               setRouteStats(null);
             }}
-          />
+          >
+            <Text style={styles.floatingButtonText}>❌</Text>
+            </TouchableOpacity>
         </View>
       )}
 
       {/* Button to interact with coordinate variables */}
-      <View style={styles.buttonContainer}>
+      <View style={[
+        styles.bottomContainerWrapper,
+        { bottom: safeAreaInsets.bottom + 16 }
+        ]}>
         {loadingDatabase ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-            <ActivityIndicator size="small" color="blue" />
-            <Text>Synchronizing Database...</Text>
+          <View style={styles.loadingDatabaseRow}>
+            <ActivityIndicator size="small" color="#1A53A0" />
+            <Text style={styles.loadingDatabaseText}>Synchronizing Database...</Text>
             </View>
         ) : (
-          <View style={{ width: '100%', gap: 10 }}>
+          <View style={{ width: '100%', gap: 8 }}>
             {/* displays live calculation when pin route is generated */}
             {routeStats && (
-              <View style={styles.statsRow}>
-                <Text style={styles.statsText}> {routeStats.distance.toFixed(1)} miles</Text>
-                <Text style={styles.statsText}> {formatDuration(routeStats.duration)}</Text>
+              <View style={styles.floatingStatsRow}>
+                <Text style={styles.statsText}>🛣️ {routeStats.distance.toFixed(1)} miles</Text>
+                <Text style={styles.statsText}>⏱️ {formatDuration(routeStats.duration)}</Text>
                 </View>
             )}
-          <Button
-            title={selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
+          <TouchableOpacity
+            style={[
+              styles.floatingActionBadgeBar,
+              !selectedDestination && styles.disabledFloatingActionBadgeBar
+            ]}
             disabled={!selectedDestination}
             onPress={shareWithExternalMap}
-          />
+          >
+            <Text style={[
+              styles.floatingActionBadgeText,
+              !selectedDestination && { color: '#8895a5' }
+            ]}>
+              {selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
+            </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -456,7 +536,6 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 40,
     left: 20,
     right: 20,
     backgroundColor: 'white',
@@ -491,14 +570,43 @@ const styles = StyleSheet.create({
   },
 
   statsText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#333',
   },
 
+  clearRouteWrapper: {
+    position: 'absolute',
+    left: 20,
+    zIndex: 10,
+  },
+
+  floatingActionCloseCircle: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ffccd5',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    //crispy shadow framing
+    elevation: 4,
+    shadowColor: '#d9534f',
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  floatingButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+/*
   clearRouteContainer: {
     position: 'absolute',
-    top: 105, // float right below ev charging filter, change later to move ev filter to settings menu
     left: 20,
     right: 20,
     backgroundColor: 'white',
@@ -509,6 +617,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
+  */
 
   calloutBubble: {
     padding: 8,
@@ -551,5 +660,83 @@ const styles = StyleSheet.create({
   amenityText: {
     fontSize: 14,
     letterSpacing: 2, // keeps icons uniform and decluttered
+  },
+
+  bottomContainerWrapper: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 10,
+  },
+
+  floatingActionBadgeBar: {
+    backgroundColor: '#1A53A0',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#154280',
+
+    // shadow elevation lines crispy
+    elevation: 4,
+    shadowColor: '#1A53A0',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+  },
+
+  // semi transparent gray placeholder when no pin is selected
+  disabledFloatingActionBadgeBar: {
+    backgroundColor: 'rgba(235, 240, 250, 0.92)',
+    borderColor: 'rgba(210, 220, 235, 0.6)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+
+  floatingActionBadgeText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  //glass effect backgrop for driving stats
+  floatingStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+  },
+
+  loadingDatabaseRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  loadingDatabaseText: {
+    fontWeight: '600',
+    color: '#666',
   },
 });
