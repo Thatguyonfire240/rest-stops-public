@@ -1,3 +1,4 @@
+/*
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -10,6 +11,12 @@ import { Collapsible } from '@/components/ui/collapsible';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+*/
+
+import { BottomTabInset, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabTwoScreen() {
   const safeAreaInsets = useSafeAreaInsets();
@@ -21,9 +28,15 @@ export default function TabTwoScreen() {
 
   const contentPlatformStyle = Platform.select({
     android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingTop: insets.top + 20,
+      paddingLeft: insets.left + 20,
+      paddingRight: insets.right + 20,
+      paddingBottom: insets.bottom,
+    },
+    ios: {
+      paddingTop: insets.top + 20,
+      paddingLeft: insets.left + 20,
+      paddingRight: insets.right + 20,
       paddingBottom: insets.bottom,
     },
     web: {
@@ -32,6 +45,57 @@ export default function TabTwoScreen() {
     },
   });
 
+  // placeholder for database auth later for user login
+  const userLoggedIn = false;
+
+  const handleAccountAction = () => {
+    if (userLoggedIn) {
+      Alert.alert("Sign Out", "Logging you out from your profile...");
+    } else {
+      Alert.alert("Sign In", "Redirecting to login screen...");
+    }
+  };
+
+  // pass styles to container
+  return (
+    <ScrollView
+      style={styles.container}
+      // add spacing
+      contentContainerStyle={contentPlatformStyle}
+    >
+      {/* account/profile bit */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Account Profile</Text>
+        <Text style={styles.bodyText}>
+          {userLoggedIn ? "Logged in as user@example.com" : "Sign in to save your favorite stops across long road trips!"}
+        </Text>
+        <View style={styles.buttonWrapper}>
+          <Button
+            title={userLoggedIn ? "Sign Out of Account" : "Sign In / Register"}
+            color={userLoggedIn ? "#d9534f" : "#1A53A0"}
+            onPress={handleAccountAction}
+          />
+        </View>
+      </View>
+
+      {/* Navigation Settings */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Navigation Settings</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Avoid Toll Roads</Text>
+          <Switch value={false} onValueChange={() => {}} />
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Display Real-time Active Traffic</Text>
+          <Switch value={true} onValueChange={() => {}} />
+        </View>
+      </View>
+
+
+    </ScrollView>
+  );
+}
+  /*
   return (
     <ScrollView
       style={[styles.scrollView, { backgroundColor: theme.background }]}
@@ -123,8 +187,11 @@ export default function TabTwoScreen() {
       </ThemedView>
     </ScrollView>
   );
-}
 
+  */
+
+
+/*
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
@@ -177,4 +244,60 @@ const styles = StyleSheet.create({
     height: 100,
     alignSelf: 'center',
   },
+});
+
+*/
+
+// stylesheet
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa'
+  },
+
+  card: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    // uniform vertical cushions
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    },
+
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#333',
+      marginBottom: 8
+    },
+
+    bodyText: {
+      fontSize: 14,
+      color: '#666',
+      lineHeight: 20,
+      marginBottom: 12
+    },
+
+    buttonWrapper: {
+      marginTop: 4
+    },
+
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee',
+    },
+
+    rowLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: '#444'
+    },
 });
