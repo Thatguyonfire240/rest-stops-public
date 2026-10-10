@@ -5,8 +5,9 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
 import { supabase } from '../../services/supabase';
+
+import AppTabs from '../components/app-tabs';
 
 // init global shared filter contexts
 interface FilterContextType {
@@ -79,7 +80,9 @@ export default function TabLayout() {
         session,
         }}>
       <AnimatedSplashOverlay />
+
       <AppTabs />
+  
       </FilterContext.Provider>
     </ThemeProvider>
   );
@@ -89,7 +92,7 @@ export default function TabLayout() {
 export const useFilters = () => {
   const context = useContext(FilterContext);
   if (!context) {
-    throw new Error("useFilters must be consumed inside a FilterContext.Provider franework");
+    throw new Error("useFilters must be consumed inside a FilterContext.Provider framework");
   }
   return context;
 };
