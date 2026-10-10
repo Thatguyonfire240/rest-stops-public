@@ -409,5 +409,6 @@ const styles = StyleSheet.create({
       padding: 12,
       fontSize: 14,
       marginBottom: 12,
+      color: 'grey'
     },
 });
