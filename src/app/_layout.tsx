@@ -1,10 +1,12 @@
+import { Session, User } from '@supabase/supabase-js';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
+import { supabase } from '../../services/supabase';
 
 // init global shared filter contexts
 interface FilterContextType {
@@ -21,6 +23,10 @@ interface FilterContextType {
   setSelectedDestination: (val: any) => void;
   routeStats: any;
   setRouteStats: (val: any) => void;
+
+  // track user login state init
+  user: User | null;
+  session: Session | null;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -38,15 +44,39 @@ export default function TabLayout() {
 
   const [selectedDestination, setSelectedDestination] = useState<any>(null);
   const [routeStats, setRouteStats] = useState<any>(null);
+  
+  // catch user login status
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  // init background listener to watch for auth
+  useEffect(() => {
+    // pull init login session immediately on application launch
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    // constant listening stream to update if user logs in, signs up etc
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <FilterContext.Provider value={{ showOnlyEv, setShowOnlyEv, 
+      <FilterContext.Provider value={{ 
+        showOnlyEv, setShowOnlyEv, 
         avoidTolls, setAvoidTolls, 
         showTrafficData, setShowTrafficData, 
         showOnlyWifi, setShowOnlyWifi,
         selectedDestination, setSelectedDestination,
-        routeStats, setRouteStats
+        routeStats, setRouteStats,
+        user,
+        session,
         }}>
       <AnimatedSplashOverlay />
       <AppTabs />

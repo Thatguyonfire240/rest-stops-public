@@ -13,41 +13,24 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 */
 
-import { BottomTabInset, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFilters } from './_layout';
 
+import { supabase } from '../../services/supabase';
+
+import { useState } from 'react';
+
 export default function TabTwoScreen() {
   const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top + 20,
-      paddingLeft: insets.left + 20,
-      paddingRight: insets.right + 20,
-      paddingBottom: insets.bottom,
-    },
-    ios: {
-      paddingTop: insets.top + 20,
-      paddingLeft: insets.left + 20,
-      paddingRight: insets.right + 20,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+  
 
+
+/*
   // placeholder for database auth later for user login
   const userLoggedIn = false;
+  */
 
   // import switch states
   const { 
@@ -56,8 +39,65 @@ export default function TabTwoScreen() {
     showTrafficData, setShowTrafficData,
     showOnlyWifi, setShowOnlyWifi,
     setSelectedDestination,
-    setRouteStats
+    setRouteStats,
+    user, session,
    } = useFilters();
+
+   // import tracker state variables
+   const [email, setEmail] = useState<string>('');
+   const [password, setPassword] = useState<string>('');
+   const [authLoading, setAuthLoading] = useState<boolean>(false);
+
+   const BottomTabInset = 49;
+   const Spacing = { three: 12, six: 24, four: 16 };
+   const insets = { ...safeAreaInsets, bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three };
+
+   const contentPlatformStyle = Platform.select({
+    android: {
+      paddingTop: insets.top + 20,
+      paddingLeft: insets.left + 20,
+      paddingRight: insets.right + 20,
+      paddingBottom: insets.bottom
+    },
+    ios: {
+      paddingTop: insets.top + 20,
+      paddingLeft: insets.left + 20,
+      paddingRight: insets.right + 20,
+      paddingBottom: insets.bottom
+    },
+    web : {
+      paddingTop: Spacing.six,
+      paddingBottom: Spacing.four
+    },
+   });
+
+   // match sign in with user records in database
+   const handleSignIn = async () => {
+    if (!email || !password) return Alert.alert("Required Fields", "Please complete all fields.");
+    setAuthLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthLoading(false);
+    if (error) Alert.alert("Login Failed", error.message);
+    else { setEmail(''); setPassword(''); }
+   };
+
+   // handle sign up and establish new account
+   const handleSignUp = async () => {
+    if (!email || !password) return Alert.alert("Required Fields", "Please complete all fields.");
+    setAuthLoading(true);
+    const { error, data } = await supabase.auth.signUp({ email, password });
+    setAuthLoading(false);
+    if (error) Alert.alert("Registration Failed", error.message);
+    else if (data.session === null) {
+      Alert.alert("Registration Success!", "Please check your email inbox to confirm your account creation.");
+    }
+   };
+
+   // disconnect user session tokens safely
+   const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) Alert.alert("Sign Out Error", error.message);
+   };
 
    const handlePreferenceChange = (stateSetter: (value: boolean) => void, currentVal: boolean) => {
     setSelectedDestination(null);
@@ -65,14 +105,6 @@ export default function TabTwoScreen() {
     stateSetter(!currentVal);
    };
 
-
-  const handleAccountAction = () => {
-    if (userLoggedIn) {
-      Alert.alert("Sign Out", "Logging you out from your profile...");
-    } else {
-      Alert.alert("Sign In", "Redirecting to login screen...");
-    }
-  };
 
   // pass styles to container
   return (
@@ -84,9 +116,71 @@ export default function TabTwoScreen() {
       {/* account/profile bit */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Account Profile</Text>
-        <Text style={styles.bodyText}>
-          {userLoggedIn ? "Logged in as user@example.com" : "Sign in to save your favorite stops across long road trips!"}
-        </Text>
+        
+        {user ? (
+          // render profile data stats and sign out
+          <View>
+            <Text style={styles.bodyText}>👋 Welcome back!</Text>
+            <Text style={styles.emailTextBadge}>{user.email}</Text>
+            <View style={{ marginTop: 12 }}>
+              <Button
+                title="Sign Out of Profile"
+                color="#d9534f"
+                onPress={handleSignOut} />
+            </View>
+          </View>
+        ) : (
+          // logged out view
+          <View style={{ gap: 10 }}>
+            <Text style={styles.bodyText}>Sign up or log in to sync settings</Text>
+
+            <TextInput
+              style={styles.inputBox}
+              placeholder="Email Address"
+              placeholderTextColor="grey"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <TextInput
+              style={styles.inputBox}
+              placeholder="Secure Password"
+              placeholderTextColor="grey"
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+              secureTextEntry={true}
+            />
+
+            {authLoading ? (
+              <ActivityIndicator
+                size="small"
+                color="#1A53A0"
+                style={{ marginVertical: 8 }}
+              />
+        ) : (
+          <View style={styles.authButtonRow}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Log In"
+                color="#1A53A0"
+                onPress={handleSignIn} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Sign Up"
+                color="#555"
+                onPress={handleSignUp} />
+            </View>
+          </View>
+        )}
+        </View>
+        )}
+      </View>
+
+{/*
         <View style={styles.buttonWrapper}>
           <Button
             title={userLoggedIn ? "Sign Out of Account" : "Sign In / Register"}
@@ -94,7 +188,8 @@ export default function TabTwoScreen() {
             onPress={handleAccountAction}
           />
         </View>
-      </View>
+        */}
+      
 
       {/* Navigation Settings */}
       <View style={styles.card}>
@@ -105,13 +200,7 @@ export default function TabTwoScreen() {
           <Switch
             value={showOnlyEv}
             onValueChange={() => handlePreferenceChange(setShowOnlyEv, showOnlyEv)}
-            /*
-            onValueChange={(newValue) => {
-              setSelectedDestination(null);
-              setRouteStats(null);
-              setShowOnlyEv(newValue);
-            }} 
-              */
+        
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={showOnlyEv ? '#1A53A0' : '#f4f3f4'}
           />
@@ -122,13 +211,7 @@ export default function TabTwoScreen() {
           <Switch
             value={showOnlyWifi}
             onValueChange={() => handlePreferenceChange(setShowOnlyWifi, showOnlyWifi)}
-            /*
-            onValueChange={(newValue) => {
-              setSelectedDestination(null);
-              setRouteStats(null);
-              setShowOnlyWifi(newValue);
-            }}
-            */
+        
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={showOnlyWifi ? '#1A53A0' : '#f4f3f4'}
           />
@@ -139,13 +222,7 @@ export default function TabTwoScreen() {
           <Switch
             value={avoidTolls}
             onValueChange={() => handlePreferenceChange(setAvoidTolls, avoidTolls)}
-            /*
-            onValueChange={(newValue) => {
-              setSelectedDestination(null);
-              setRouteStats(null);
-              setAvoidTolls(newValue);
-            }}
-            */
+          
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={avoidTolls ? '#1A53A0' : '#f4f3f4'}
           />
@@ -156,13 +233,7 @@ export default function TabTwoScreen() {
           <Switch
             value={showTrafficData}
             onValueChange={() => handlePreferenceChange(setShowTrafficData, showTrafficData)}
-            /*
-            onValueChange={(newValue) => {
-              setSelectedDestination(null);
-              setRouteStats(null);
-              setShowTrafficData(newValue);
-            }}
-            */
+        
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={showTrafficData ? '#1A53A0' : '#f4f3f4'}
           />
@@ -379,5 +450,34 @@ const styles = StyleSheet.create({
       fontSize: 14,
       fontWeight: '500',
       color: '#444'
+    },
+
+    inputBox: {
+      backgroundColor: '#f1f5f9',
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      fontSize: 14,
+      color: '#333',
+    },
+
+    authButtonRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 6,
+    },
+
+    emailTextBadge: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '1A53A0',
+      backgroundColor: '#edf2f7',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      alignSelf: 'flex-start',
+      marginTop: 4,
     },
 });
