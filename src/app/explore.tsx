@@ -13,7 +13,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 */
 
-import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFilters } from './_layout';
 
@@ -43,6 +43,8 @@ export default function SettingsScreen() {
    // track password confirmation text
    const [confirmPassword, setConfirmPassword] = useState<string>('');
    const [authLoading, setAuthLoading] = useState<boolean>(false);
+   
+   const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
 
    const BottomTabInset = 49;
    const Spacing = { three: 12, six: 24, four: 16 };
@@ -245,6 +247,45 @@ export default function SettingsScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
         />
+
+        <View style={styles.passwordInputContainer}>
+          <TextInput
+            style={styles.passwordInputBox}
+            placeholder="Secure Password"
+            placeholderTextColor="grey"
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            secureTextEntry={!isPasswordVisible}
+          />
+          <TouchableOpacity
+            style={styles.eyeIconWrapper}
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          >
+            <Text style={styles.eyeIconText}>{isPasswordVisible ? '👁️' : '🙈'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeAuthView === 'SIGNUP' && (
+          <View style={styles.passwordInputContainer}>
+            <TextInput
+              style={styles.passwordInputBox}
+              placeholder="Confirm Password"
+              placeholderTextColor="grey"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+              secureTextEntry={!isPasswordVisible}
+            />
+            <TouchableOpacity
+              style={styles.eyeIconWrapper}
+              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            >
+              <Text style={styles.eyeIconText}>{isPasswordVisible ? '👁️' : '🙈'}</Text>
+            </TouchableOpacity>
+          </View>
+
+        /*
         <TextInput
           style={styles.inputBox}
           placeholder="Secure Password"
@@ -265,6 +306,8 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             secureTextEntry={true}
           />
+
+          */
         )}
 
         <View style={{ gap: 10, marginTop: 12 }}>
@@ -409,6 +452,37 @@ const styles = StyleSheet.create({
       padding: 12,
       fontSize: 14,
       marginBottom: 12,
+      color: '#333'
+    },
+
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'white',
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      borderRadius: 8,
+      marginBottom: 12,
+      height: 50,
       color: 'grey'
+    },
+
+    passwordInputBox: {
+      flex: 1,
+      paddingHorizontal: 12,
+      fontSize: 14,
+      color: '#333',
+      height: '100%',
+    },
+
+    eyeIconWrapper: {
+      paddingHorizontal: 14,
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    eyeIconText: {
+      fontSize: 16,
     },
 });
