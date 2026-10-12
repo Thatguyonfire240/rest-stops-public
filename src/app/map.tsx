@@ -481,7 +481,12 @@ const shareWithExternalMap = () => {
             <Text style={[
               styles.floatingActionBadgeText,
               !selectedDestination && { color: '#8895a5' }
-            ]}>
+            ]}
+
+            // lock text to one row, add '...' to end if too long
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            >
               {selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
             </Text>
             </TouchableOpacity>
@@ -643,6 +648,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#154280',
+
+    paddingHorizontal: 20,
 
     // shadow elevation lines crispy
     elevation: 4,

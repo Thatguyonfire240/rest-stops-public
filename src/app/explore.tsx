@@ -182,7 +182,11 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, isDarkMode && { color: '#fff' }]}>Navigation Settings</Text>
 
         <View style={styles.row}>
-          <Text style={[styles.rowLabel, !user && { color: '#aaa' }, isDarkMode && { color: '#eee' }]}>⭐ Show Only My Favorites</Text>
+          <Text style={[styles.rowLabel,
+            { color: !user ? '#666' : (isDarkMode ? '#eee' : '#444') }
+          ]}>
+            ⭐ Show Only My Favorites
+          </Text>
           <Switch
             value={showOnlyFavorites}
             // disables automatically if user is anonymous
