@@ -2,7 +2,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { Alert, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { supabase } from '../../services/supabase';
@@ -28,6 +28,9 @@ interface FilterContextType {
   // track user login state init
   user: User | null;
   session: Session | null;
+
+  favoriteStopIds: string[];
+  toggleFavoriteStop: (stopId: string) => Promise<void>;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -50,6 +53,10 @@ export default function TabLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
+  // hooks for fave stop IDs
+  const [favoriteStopIds, setFavoriteStopIds] = useState<string[]>([]);
+
+
   // init background listener to watch for auth
   useEffect(() => {
     // pull init login session immediately on application launch
@@ -67,6 +74,47 @@ export default function TabLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // pull user faves from database
+  useEffect(() => {
+    if (!user) {
+      // wipe cache if logged out
+      setFavoriteStopIds([]);
+      return;
+    }
+
+    const fetchFavorites = async () => {
+      const { data, error } = await supabase
+        .from('favorite_stops')
+        .select('stop_id');
+
+      if (!error && data) {
+        setFavoriteStopIds(data.map(item => item.stop_id));
+      }
+    };
+
+    fetchFavorites();
+  }, [user]);
+
+  // handler to add/remove favorites from cloud dynamically
+  const toggleFavoriteStop = async (stopId: string) => {
+    if (!user) {
+      Alert.alert("Account Required", "Please log in to bookmark favorite rest stops.");
+      return;
+    }
+
+    const isFav = favoriteStopIds.includes(stopId);
+
+    if (isFav) {
+      // remove from cloud
+      setFavoriteStopIds(prev => prev.filter(id => id !== stopId));
+      await supabase.from('favorite_stops').delete().eq('user_id', user.id).eq('stop_id', stopId);
+    } else {
+      // add to cloud
+      setFavoriteStopIds(prev => [...prev, stopId]);
+      await supabase.from('favorite_stops').insert({ user_id: user.id, stop_id: stopId });
+    }
+  };
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <FilterContext.Provider value={{ 
@@ -78,6 +126,8 @@ export default function TabLayout() {
         routeStats, setRouteStats,
         user,
         session,
+        favoriteStopIds,
+        toggleFavoriteStop,
         }}>
       <AnimatedSplashOverlay />
 

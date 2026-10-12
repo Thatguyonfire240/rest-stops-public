@@ -65,7 +65,10 @@ export default function App() {
     selectedDestination,
     setSelectedDestination,
     routeStats,
-    setRouteStats
+    setRouteStats,
+    user,
+    favoriteStopIds,
+    toggleFavoriteStop,
   } = useFilters();
 
 /*
@@ -504,10 +507,13 @@ const shareWithExternalMap = () => {
                 <Text style={styles.statsText}>⏱️ {formatDuration(routeStats.duration)}</Text>
                 </View>
             )}
+
+          <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
           <TouchableOpacity
             style={[
               styles.floatingActionBadgeBar,
-              !selectedDestination && styles.disabledFloatingActionBadgeBar
+              !selectedDestination && styles.disabledFloatingActionBadgeBar,
+              { flex: 1 }
             ]}
             disabled={!selectedDestination}
             onPress={shareWithExternalMap}
@@ -519,6 +525,19 @@ const shareWithExternalMap = () => {
               {selectedDestination ? `Navigate to ${selectedDestination.name}` : "Select a Stop to Navigate"}
             </Text>
             </TouchableOpacity>
+
+            {selectedDestination && (
+              <TouchableOpacity
+                style={styles.floatingActionStarCircle}
+                onPress={() => toggleFavoriteStop(selectedDestination.id)}
+              >
+                <Text style={styles.starButtonText}>
+                  {favoriteStopIds.includes(selectedDestination.id) ? '🌟' : '⭐'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           </View>
         )}
       </View>
@@ -738,5 +757,52 @@ const styles = StyleSheet.create({
   loadingDatabaseText: {
     fontWeight: '600',
     color: '#666',
+  },
+
+  calloutTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    gap: 8,
+    marginBottom:4,
+  },
+
+
+  starTouchArea: {
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  floatingActionStarCircle: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 25,
+    width: 50,
+    // aligns with 50px high navigation badge bar
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  starButtonText: {
+    fontSize: 18,
+    textAlign: 'center',
+    // centers text vertically on android
+    textAlignVertical: 'center',
+    // wipes out invisible native font
+    includeFontPadding: false,
+    // locks bounding frame height
+    lineHeight: 22,
+    color: '#f59e0b',
+    // fine tune by pixel offset if system font forces lower text
+    transform: [{ translateY: -1 }],
   },
 });
