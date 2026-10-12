@@ -69,6 +69,7 @@ export default function App() {
     user,
     favoriteStopIds,
     toggleFavoriteStop,
+    showOnlyFavorites,
   } = useFilters();
 
 /*
@@ -347,6 +348,11 @@ const shareWithExternalMap = () => {
       return false;
     }
 
+    // filters out pins not in favorites
+    if (showOnlyFavorites && !favoriteStopIds.includes(pin.id)) {
+      return false;
+    }
+
     // when rest stop clears all checks, display
     return true;
   });
@@ -359,7 +365,7 @@ const shareWithExternalMap = () => {
       // binds map to reference handle
       ref={mapRef} 
       // re renders whenever pin count changes
-      key={`map-canvas-${displayedPins.length}-${avoidTolls}-${showTrafficData}`} 
+      key={`map-canvas-${displayedPins.length}-${avoidTolls}-${showTrafficData}-${showOnlyFavorites}`} 
       style={styles.map} 
       provider={PROVIDER_GOOGLE} 
       initialRegion={{

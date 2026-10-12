@@ -31,6 +31,9 @@ interface FilterContextType {
 
   favoriteStopIds: string[];
   toggleFavoriteStop: (stopId: string) => Promise<void>;
+
+  showOnlyFavorites: boolean;
+  setShowOnlyFavorites: (val: boolean) => void;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -56,6 +59,8 @@ export default function TabLayout() {
   // hooks for fave stop IDs
   const [favoriteStopIds, setFavoriteStopIds] = useState<string[]>([]);
 
+  // hook for showing only favorites
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState<boolean>(false);
 
   // init background listener to watch for auth
   useEffect(() => {
@@ -128,6 +133,8 @@ export default function TabLayout() {
         session,
         favoriteStopIds,
         toggleFavoriteStop,
+        showOnlyFavorites,
+        setShowOnlyFavorites,
         }}>
       <AnimatedSplashOverlay />
 

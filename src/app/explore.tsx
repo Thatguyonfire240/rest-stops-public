@@ -34,6 +34,7 @@ export default function SettingsScreen() {
     setSelectedDestination,
     setRouteStats,
     user, session,
+    showOnlyFavorites, setShowOnlyFavorites,
    } = useFilters();
 
    // import tracker state variables
@@ -178,6 +179,18 @@ export default function SettingsScreen() {
       {/* Navigation Settings */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Navigation Settings</Text>
+
+        <View style={styles.row}>
+          <Text style={[styles.rowLabel, !user && { color: '#aaa' }]}>⭐ Show Only My Favorites</Text>
+          <Switch
+            value={showOnlyFavorites}
+            // disables automatically if user is anonymous
+            disabled={!user}
+            onValueChange={() => handlePreferenceChange(setShowOnlyFavorites, showOnlyFavorites)}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={showOnlyFavorites ? '#1A53A0' : '#f4f3f4'}
+          />
+        </View>
 
         <View style={styles.row}>
           <Text style={styles.rowLabel}>⚡ Show Only EV Charging Stops</Text>
