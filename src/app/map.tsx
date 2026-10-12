@@ -46,15 +46,7 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   // loading for database state
   const [loadingDatabase, setLoadingDatabase] = useState<boolean>(true);
-/*
-  // ev mode toggle
-  const [showOnlyEV, setShowOnlyEV] = useState<boolean>(false);
-*/
-  
-/*
-  // route stats
-  const [routeStats, setRouteStats] = useState<{ distance: number; duration: number } | null>(null);
-  */
+
 
   // update map reference
   const mapRef = useRef<MapView | null>(null);
@@ -75,13 +67,7 @@ export default function App() {
     showOnlyFavorites,
   } = useFilters();
 
-/*
-  useEffect(() => {
-    setSelectedDestination(null);
-    setRouteStats(null);
-  }, [showOnlyEv, avoidTolls, showTrafficData, showOnlyWifi]);
 
-  */
 
   const getUserLiveLocation = async () => {
     try {
@@ -181,31 +167,6 @@ export default function App() {
         }));
       }
 
-      // simulation of fast cloud response delay
-      /*
-      await new Promise(resolve => setTimeout(resolve, 10000));
-
-      const databaseResponse: LocationCoordinates[] = [
-        {
-          id: '1',
-          latitude: 32.5191,
-          longitude: -102.6121,
-          name: 'Andrews County Northbound, TX',
-        },
-        {
-          id: '2',
-          latitude: 30.2117,
-          longitude: -97.7971,
-          name: 'Garrison Park, Austin, TX',
-        },
-        {
-          id: '3',
-          latitude: 30.2672,
-          longitude: -97.7431,
-          name: 'Downtown Austin, TX',
-        },
-      ];
-      */
 
       // error catching
     } catch (error) {
@@ -466,17 +427,7 @@ const shareWithExternalMap = () => {
         )}
       </MapView>
 
-{/*
-      {/* Button to toggle filter on/off }
-      <View style={styles.filterContainer}>
-        <Button
-          title={showOnlyEV ? "Showing EV Charging Only" : "Filter: All Rest Stops"}
-          color={showOnlyEV ? "green" : "#666"}
-          // toggles button on/off
-          onPress= {() => setShowOnlyEV(!showOnlyEV)}
-          />
-      </View>
-      */}
+
 
       {/* Button to clear route */}
       {selectedDestination && (
@@ -632,20 +583,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-/*
-  clearRouteContainer: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 5,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  */
+
 
   calloutBubble: {
     padding: 8,
