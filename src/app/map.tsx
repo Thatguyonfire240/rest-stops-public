@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Linking, Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +30,9 @@ interface RouteContainer {
 export default function App() {
 
   const safeAreaInsets = useSafeAreaInsets();
+  // implemented dark mode
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
  
   // init animation value for map opacity
   const [mapOpacity] = useState(new Animated.Value(0)); 
@@ -482,7 +485,7 @@ const shareWithExternalMap = () => {
           { top: safeAreaInsets.top + 12 }
           ]}>
           <TouchableOpacity
-            style={styles.floatingActionCloseCircle}
+            style={[styles.floatingActionCloseCircle, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}
             // deselect pin and remove mileage/eta
             onPress={() => {
               setSelectedDestination(null);
@@ -508,9 +511,9 @@ const shareWithExternalMap = () => {
           <View style={{ width: '100%', gap: 8 }}>
             {/* displays live calculation when pin route is generated */}
             {routeStats && (
-              <View style={styles.floatingStatsRow}>
-                <Text style={styles.statsText}>🛣️ {routeStats.distance.toFixed(1)} miles</Text>
-                <Text style={styles.statsText}>⏱️ {formatDuration(routeStats.duration)}</Text>
+              <View style={[styles.floatingStatsRow, isDarkMode && { backgroundColor: '#1e1e1e', borderColor: '#333' }]}>
+                <Text style={[styles.statsText, isDarkMode && { color: '#fff' }]}>🛣️ {routeStats.distance.toFixed(1)} miles</Text>
+                <Text style={[styles.statsText, isDarkMode && { color: '#fff' }]}>⏱️ {formatDuration(routeStats.duration)}</Text>
                 </View>
             )}
 
@@ -534,7 +537,7 @@ const shareWithExternalMap = () => {
 
             {selectedDestination && (
               <TouchableOpacity
-                style={styles.floatingActionStarCircle}
+                style={[styles.floatingActionStarCircle, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}
                 onPress={() => toggleFavoriteStop(selectedDestination.id)}
               >
                 <Text style={styles.starButtonText}>

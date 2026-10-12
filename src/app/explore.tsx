@@ -13,7 +13,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 */
 
-import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFilters } from './_layout';
 
@@ -23,7 +23,9 @@ import { useState } from 'react';
 
 export default function SettingsScreen() {
   const safeAreaInsets = useSafeAreaInsets();
-
+  const colorScheme = useColorScheme();
+  // dynamic dark mode
+  const isDarkMode = colorScheme === 'dark';
 
   // import switch states
   const { 
@@ -74,10 +76,17 @@ export default function SettingsScreen() {
    const handleSignIn = async () => {
     if (!email || !password) return Alert.alert("Required Fields", "Please complete all fields.");
     setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setAuthLoading(false);
-    if (error) Alert.alert("Login Failed", error.message);
-    else { setEmail(''); setPassword(''); }
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthLoading(true);
+
+    if (error)  {
+      setAuthLoading(false);
+      Alert.alert("Login Failed", error.message);
+    } else {
+      setActiveAuthView('NONE');
+      setEmail('');
+      setPassword('');
+    }
    };
 
    // handle sign up and establish new account
@@ -90,18 +99,23 @@ export default function SettingsScreen() {
 
     setAuthLoading(true);
     const { error, data } = await supabase.auth.signUp({ email, password });
-    setAuthLoading(false);
+    setAuthLoading(true);
 
-    if (error) Alert.alert("Registration Failed", error.message);
-    else if (data.session === null) {
-      Alert.alert("Registration Success!", "Please check your email inbox to confirm your account creation.");
-
-      //clears inputs and slides overlay closed upon sucess
+    if (error) {
+      setAuthLoading(false);
+      Alert.alert("Registration Failed", error.message);
+    } else {
+      // collapses screen and cleares cache
       setActiveAuthView('NONE');
+      setAuthLoading(false);
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+
+      if (data.session === null) {
+      Alert.alert("Registration Success!", "Please check your email inbox to confirm your account creation.");
     }
+  }
    };
 
    // disconnect user session tokens safely
@@ -119,27 +133,27 @@ export default function SettingsScreen() {
 
   // pass styles to container
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#121212' : '#f8f9fa' }}>
     <ScrollView
       contentContainerStyle={{
         padding: 20,
         paddingTop: safeAreaInsets.top + 20,
         gap: 16
       }}
-    /*
-      style={styles.container}
-      // add spacing
-      contentContainerStyle={contentPlatformStyle}
-      */
+
+      // add dynamic dark mode
+      style={isDarkMode && { backgroundColor: '#121212' }}
     >
+
+
       {/* account/profile bit */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Account Profile</Text>
+      <View style={[styles.card, isDarkMode && { backgroundColor: '#1e1e1e', borderColor: '#333' }]}>
+        <Text style={[styles.sectionTitle, isDarkMode && { color: '#fff' }]}>Account Profile</Text>
         
         {user ? (
           // render profile data stats and sign out
           <View>
-            <Text style={styles.bodyText}>👋 Welcome back!</Text>
+            <Text style={[styles.bodyText, isDarkMode && { color: '#bbb'}]}>👋 Welcome back!</Text>
             <Text style={styles.emailTextBadge}>{user.email}</Text>
             <View style={{ marginTop: 12 }}>
               <Button
@@ -151,7 +165,7 @@ export default function SettingsScreen() {
         ) : (
           // logged out view
           <View style={{ gap: 10 }}>
-            <Text style={styles.bodyText}>Sign up or log in to sync settings</Text>
+            <Text style={[styles.bodyText, isDarkMode && { color: '#bbb' }]}>Sign up or log in to sync settings</Text>
 
             <View style={styles.authLinkRow}>
               <View style={{ flex: 1 }}>
@@ -177,11 +191,11 @@ export default function SettingsScreen() {
       
 
       {/* Navigation Settings */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Navigation Settings</Text>
+      <View style={[styles.card, isDarkMode && { backgroundColor: '#1e1e1e', borderColor: '#333' }]}>
+        <Text style={[styles.sectionTitle, isDarkMode && { color: '#fff' }]}>Navigation Settings</Text>
 
         <View style={styles.row}>
-          <Text style={[styles.rowLabel, !user && { color: '#aaa' }]}>⭐ Show Only My Favorites</Text>
+          <Text style={[styles.rowLabel, !user && { color: '#aaa' }, isDarkMode && { color: '#eee' }]}>⭐ Show Only My Favorites</Text>
           <Switch
             value={showOnlyFavorites}
             // disables automatically if user is anonymous
@@ -193,7 +207,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>⚡ Show Only EV Charging Stops</Text>
+          <Text style={[styles.rowLabel, isDarkMode && { color: '#eee' }]}>⚡ Show Only EV Charging Stops</Text>
           <Switch
             value={showOnlyEv}
             onValueChange={() => handlePreferenceChange(setShowOnlyEv, showOnlyEv)}
@@ -204,7 +218,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>📶 Show Only Stops With Wifi</Text>
+          <Text style={[styles.rowLabel, isDarkMode && { color: '#eee' }]}>📶 Show Only Stops With Wifi</Text>
           <Switch
             value={showOnlyWifi}
             onValueChange={() => handlePreferenceChange(setShowOnlyWifi, showOnlyWifi)}
@@ -215,7 +229,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>🛣️ Avoid Toll Roads</Text>
+          <Text style={[styles.rowLabel, isDarkMode && { color: '#eee'}]}>🛣️ Avoid Toll Roads</Text>
           <Switch
             value={avoidTolls}
             onValueChange={() => handlePreferenceChange(setAvoidTolls, avoidTolls)}
@@ -226,7 +240,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>🚗 Display Real-time Active Traffic</Text>
+          <Text style={[styles.rowLabel, isDarkMode && { color: '#eee'}]}>🚗 Display Real-time Active Traffic</Text>
           <Switch
             value={showTrafficData}
             onValueChange={() => handlePreferenceChange(setShowTrafficData, showTrafficData)}
@@ -243,16 +257,16 @@ export default function SettingsScreen() {
     </ScrollView>
 
     {activeAuthView !== 'NONE' && (
-      <View style={[styles.authFullScreenModal, { paddingTop: safeAreaInsets.top + 40 }]}>
-        <Text style={styles.modalTitle}>
+      <View style={[styles.authFullScreenModal, isDarkMode && { backgroundColor: '#121212'}, { paddingTop: safeAreaInsets.top + 40 }]}>
+        <Text style={[styles.modalTitle, isDarkMode && { color: '#fff' }]}>
           {activeAuthView === 'LOGIN' ? 'Welcome Back!' : 'Join our Journey'}
         </Text>
-        <Text style={styles.modalSubtitle}>
+        <Text style={[styles.modalSubtitle, isDarkMode && { color: '#aaa' }]}>
           {activeAuthView === 'LOGIN' ? 'Sign in to access your cloud-saved settings.' : 'Register an account to cross-sync configurations.'}
         </Text>
 
         <TextInput
-          style={styles.inputBox}
+          style={[styles.inputBox, isDarkMode && { backgroundColor: '#222', borderColor: '#444', color: '#fff' }]}
           placeholder="Email Address"
           placeholderTextColor="grey"
           value={email}
@@ -261,9 +275,9 @@ export default function SettingsScreen() {
           keyboardType="email-address"
         />
 
-        <View style={styles.passwordInputContainer}>
+        <View style={[styles.passwordInputContainer, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}>
           <TextInput
-            style={styles.passwordInputBox}
+            style={[styles.passwordInputBox, isDarkMode && { color: '#fff' }]}
             placeholder="Secure Password"
             placeholderTextColor="grey"
             value={password}
@@ -280,9 +294,9 @@ export default function SettingsScreen() {
         </View>
 
         {activeAuthView === 'SIGNUP' && (
-          <View style={styles.passwordInputContainer}>
+          <View style={[styles.passwordInputContainer, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}>
             <TextInput
-              style={styles.passwordInputBox}
+              style={[styles.passwordInputBox, isDarkMode && { color: '#fff' }]}
               placeholder="Confirm Password"
               placeholderTextColor="grey"
               value={confirmPassword}
@@ -297,30 +311,6 @@ export default function SettingsScreen() {
               <Text style={styles.eyeIconText}>{isPasswordVisible ? '👁️' : '🙈'}</Text>
             </TouchableOpacity>
           </View>
-
-        /*
-        <TextInput
-          style={styles.inputBox}
-          placeholder="Secure Password"
-          placeholderTextColor="grey"
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
-          secureTextEntry={true}
-        />
-
-        {activeAuthView === 'SIGNUP' && (
-          <TextInput
-            style={styles.inputBox}
-            placeholder="Confirm Password"
-            placeholderTextColor="grey"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            autoCapitalize="none"
-            secureTextEntry={true}
-          />
-
-          */
         )}
 
         <View style={{ gap: 10, marginTop: 12 }}>
