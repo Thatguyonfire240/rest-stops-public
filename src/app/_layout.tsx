@@ -34,6 +34,10 @@ interface FilterContextType {
 
   showOnlyFavorites: boolean;
   setShowOnlyFavorites: (val: boolean) => void;
+
+  // premium tracking
+  isPremiumUser: boolean;
+  setIsPremiumUser: (val: boolean) => void;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -61,6 +65,9 @@ export default function TabLayout() {
 
   // hook for showing only favorites
   const [showOnlyFavorites, setShowOnlyFavorites] = useState<boolean>(false);
+  
+  // hook for premium user handling, init as false
+  const [isPremiumUser, setIsPremiumUser] = useState<boolean>(false);
 
   // init background listener to watch for auth
   useEffect(() => {
@@ -133,8 +140,8 @@ export default function TabLayout() {
         session,
         favoriteStopIds,
         toggleFavoriteStop,
-        showOnlyFavorites,
-        setShowOnlyFavorites,
+        showOnlyFavorites, setShowOnlyFavorites,
+        isPremiumUser, setIsPremiumUser,
         }}>
       <AnimatedSplashOverlay />
 

@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Linking, Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,6 +47,14 @@ export default function App() {
   // loading for database state
   const [loadingDatabase, setLoadingDatabase] = useState<boolean>(true);
 
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
+
+  const [subscriberPins, setSubscriberPins] = useState<any[]>([]);
+
+  const [pendingCoords, setPendingCoords] = useState<{ latitude: Number; longitude: Number } | null>(null);
+  const [customPinName, setCustomPinName] = useState<string>('');
+  const [isSavingPin, setIsSavingPin] = useState<boolean>(false);
+
 
   // update map reference
   const mapRef = useRef<MapView | null>(null);
@@ -65,9 +73,31 @@ export default function App() {
     favoriteStopIds,
     toggleFavoriteStop,
     showOnlyFavorites,
+    isPremiumUser,
   } = useFilters();
 
 
+  
+    
+
+    const fetchSubscriberPins = async () => {
+      if (!user || !isPremiumUser) {
+      setSubscriberPins([]);
+      return;
+    }
+      const {data, error } = await supabase
+        .from('subscriber_pins')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (!error && data) {
+        setSubscriberPins(data);
+      }
+    };
+
+    useEffect(() => {
+      fetchSubscriberPins();
+    }, [user, isPremiumUser]);
 
   const getUserLiveLocation = async () => {
     try {
@@ -329,7 +359,7 @@ const shareWithExternalMap = () => {
       // binds map to reference handle
       ref={mapRef} 
       // re renders whenever pin count changes
-      key={`map-canvas-${displayedPins.length}-${avoidTolls}-${showTrafficData}-${showOnlyFavorites}`} 
+      key={`map-canvas-${displayedPins.length}-${avoidTolls}-${showTrafficData}-${showOnlyFavorites}-${isPremiumUser}`} 
       style={styles.map} 
       provider={PROVIDER_GOOGLE} 
       initialRegion={{
@@ -340,6 +370,18 @@ const shareWithExternalMap = () => {
         showsUserLocation={true} 
         showsIndoors={false} 
         showsTraffic={showTrafficData}
+
+        // intercept long press coordinates (shows paywall if not premium sub)
+        onLongPress={async (e) => {
+          if (!user) return Alert.alert("Account Required", "Please log in to manage custom trip pins.");
+          if (!isPremiumUser) {
+            setShowPaywall(true);
+            return;
+          }
+
+          const { latitude, longitude } = e.nativeEvent.coordinate;
+          setPendingCoords({ latitude, longitude });
+        }}
       >
         {/* render physical pins from state variable */}
         {currentRoute.origin && (
@@ -382,6 +424,76 @@ const shareWithExternalMap = () => {
             </Callout>
           </Marker>
         ))}
+
+        {/* Premium pin loop*/}
+        {isPremiumUser && user && subscriberPins && subscriberPins
+          .filter(pin => !showOnlyFavorites || favoriteStopIds.includes(pin.id)) // Obeys the favorites toggle seamlessly
+          .map((customPin) => (
+            <Marker
+              key={customPin.id}
+              coordinate={{ latitude: customPin.latitude, longitude: customPin.longitude }}
+              title={customPin.name}
+              description="💎 Subscriber Custom Stop"
+              pinColor={selectedDestination?.id === customPin.id ? "green" : "purple"} // premium badge
+              onPress={() => {
+                setRouteStats(null);
+                setSelectedDestination({
+                  id: customPin.id,
+                  name: customPin.name,
+                  latitude: customPin.latitude,
+                  longitude: customPin.longitude,
+                  amenities: ['custom'] // placeholder to prevent crash loops in renders
+                });
+              }}
+
+              onCalloutPress={() => {
+                Alert.alert(
+                  "Delete Custom Pin",
+                  `Are you sure you want to permanently delete '${customPin.name}' from your cloud travel map profile?`,
+                  [
+                    { text: "Cancel", style:"cancel" },
+                    {
+                      text: "🗑️ Delete Pin",
+                      style: "destructive",
+                      onPress: async () => {
+                        const { error } = await supabase
+                          .from('subscriber_pins')
+                          .delete()
+                          .eq('id', customPin.id)
+                          .eq('user_id', user.id);
+
+                          if (error) {
+                            Alert.alert("Delete Error", error.message);
+                          } else {
+                            Alert.alert("Deleted", `'${customPin.name}' removed from your profile.`);
+                            if (selectedDestination?.id === customPin.id) {
+                              setSelectedDestination(null);
+                              setRouteStats(null);
+                            }
+                            await fetchSubscriberPins();
+                          }
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+
+              <Callout tooltip={false}>
+                <View style={{ padding: 4, minWidth: 140, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 2 }}>
+                    {customPin.name}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#d9534f', fontWeight: '600', marginTop: 2 }}>
+                    🛑 Tap Bubble to Remove
+                  </Text>
+                </View>
+              </Callout>
+            </Marker>
+          ))
+        }
+
+      
 
         {/* calculate and show directions if user has selected a destination pin */}
         {currentRoute.origin && selectedDestination && (
@@ -506,6 +618,89 @@ const shareWithExternalMap = () => {
           </View>
         )}
       </View>
+
+      {showPaywall && (
+        <View style={styles.paywallOverlay}>
+          <View style={[styles.paywallCard, isDarkMode && { backgroundColor: '#1e1e1e' }]}>
+            <Text style={styles.paywallTitle}>💎 Unlock Custom Map Pins</Text>
+            <Text style={[styles.paywallSubtitle, isDarkMode && { color: '#bbb' }]}>
+              Premium subscribers can long-press anywhere on the map to drop down unlimited custom stops, synced to their cloud account dashboard!
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 4 }}>
+              <Button title="Upgrade to Premium ($4.99/mo)" color="#a855f7"
+                onPress={() => {
+                  Alert.alert("Sandbox Checkout Active", "Go to the settings screen to simulate premium activation");
+                  setShowPaywall(false);
+              }} />
+              <Button title="Maybe Later" color="#666"
+                onPress={() => setShowPaywall(false)} />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {pendingCoords && (
+        <View style={styles.paywallOverlay}>
+          <View style={[styles.paywallCard, isDarkMode && { backgroundColor: '#1e1e1e' }]}>
+            <Text style={[styles.paywallTitle, { color: '#1A53AO' }]}>📍 Drop Custom Stop</Text>
+            <Text style={[styles.paywallSubtitle, isDarkMode && { color: '#bbb' }]}>
+              Give this exact map location a label:
+            </Text>
+
+            <TextInput
+              style={[styles.inputBox, isDarkMode && { backgroundColor: '#222', borderColor: '#444', color: '#fff' }, { marginBottom: 16 }]}
+              placeholder="e.g., Hidden Campsite, My Rest Area"
+              placeholderTextColor="grey"
+              value={customPinName}
+              onChangeText={setCustomPinName}
+              autoCapitalize="words"
+            />
+
+            {isSavingPin ? (
+              <ActivityIndicator size="small" color="#1A53A0" style={{ marginVertical: 12 }} />
+            ) : (
+              <View style={{ gap: 10 }}>
+                <Button
+                  title="Save Custom Pin"
+                  color='#1A53A0'
+                  onPress={async () => {
+                    if (!customPinName.trim()) return Alert.alert("Name Required", "Please enter a name for your pin.");
+
+                    setIsSavingPin(true);
+                    const { error } = await supabase
+                      .from('subscriber_pins')
+                      .insert({
+                        user_id: user?.id,
+                        name: customPinName,
+                        latitude: pendingCoords.latitude,
+                        longitude: pendingCoords.longitude
+                      });
+
+                      setIsSavingPin(false);
+                      if (error) {
+                        Alert.alert("Save Error", error.message);
+                      } else {
+                        Alert.alert("Success!", `'${customPinName}' saved straight to your cloud profile!`);
+                        await fetchSubscriberPins();
+                        setCustomPinName('');
+                        setPendingCoords(null);
+                      }
+                  }}
+                />
+                <Button
+                  title="Cancel"
+                  color="#666"
+                  onPress={() => {
+                    setCustomPinName('');
+                    setPendingCoords(null);
+                  }}
+                  />
+                </View>
+            )}
+          </View>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -758,5 +953,58 @@ const styles = StyleSheet.create({
     color: '#f59e0b',
     // fine tune by pixel offset if system font forces lower text
     transform: [{ translateY: -1 }],
+  },
+
+  paywallOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 1000,
+  },
+
+  paywallCard: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 340,
+    elevation: 5,
+    shadowColor: '#a855f7',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  paywallTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  paywallSubtitle: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,    
+  },
+
+  inputBox: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#333',
+    width: '100%',
   },
 });

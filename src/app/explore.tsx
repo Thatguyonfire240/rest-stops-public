@@ -24,6 +24,7 @@ export default function SettingsScreen() {
     setRouteStats,
     user, session,
     showOnlyFavorites, setShowOnlyFavorites,
+    isPremiumUser, setIsPremiumUser,
    } = useFilters();
 
    // import tracker state variables
@@ -142,6 +143,18 @@ export default function SettingsScreen() {
           <View>
             <Text style={[styles.bodyText, isDarkMode && { color: '#bbb'}]}>👋 Welcome back!</Text>
             <Text style={styles.emailTextBadge}>{user.email}</Text>
+            <View style={styles.row}>
+              <Text style={[styles.rowLabel, !user && { color: '#aaa' }, isDarkMode && { color: '#eee' }]}>
+                💎 Unlock Premium Features (Simulated)
+              </Text>
+              <Switch
+                value={isPremiumUser}
+                disabled={!user} // first locks behind needing to be logged in
+                onValueChange={(newValue) => setIsPremiumUser(newValue)}
+                trackColor={{ false: '#767577', true: '#a855f7' }} //accent for premium feel (change color later)
+                thumbColor={isPremiumUser ? '#6b21a8' : '#f4f3f4'}
+              />
+            </View>
             <View style={{ marginTop: 12 }}>
               <Button
                 title="Sign Out of Profile"
