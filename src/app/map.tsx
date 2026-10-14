@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import { useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Button, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Callout, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
@@ -68,6 +68,10 @@ export default function App() {
   const [pendingCoords, setPendingCoords] = useState<{ latitude: Number; longitude: Number } | null>(null);
   const [customPinName, setCustomPinName] = useState<string>('');
   const [isSavingPin, setIsSavingPin] = useState<boolean>(false);
+
+  // API COST SAVINGS
+  const [cachedCoordinates, setCachedCoordinates] = useState<any[] | null>(null);
+  const [hasFetchedActiveRoute, setHasFetchedActiveRoute] = useState<boolean>(false);
 
 
   // update map reference
@@ -428,6 +432,10 @@ const shareWithExternalMap = () => {
             pinColor={selectedDestination?.id === pin.id ? "green" : "blue"} //highlights green if selected, otherwise default to blue
             onPress={() => {
               setRouteStats(null); 
+
+              setCachedCoordinates(null);
+              setHasFetchedActiveRoute(false);
+
               setSelectedDestination(pin); // sets selected pin to state variable
             }}
           >
@@ -469,6 +477,10 @@ const shareWithExternalMap = () => {
               pinColor={selectedDestination?.id === customPin.id ? "green" : "purple"} // premium badge
               onPress={() => {
                 setRouteStats(null);
+
+                setCachedCoordinates(null);
+                setHasFetchedActiveRoute(false);
+
                 setSelectedDestination({
                   id: customPin.id,
                   name: customPin.name,
@@ -529,45 +541,61 @@ const shareWithExternalMap = () => {
 
         {/* calculate and show directions if user has selected a destination pin */}
         {currentRoute.origin && selectedDestination && (
-          <MapViewDirections
-            origin={currentRoute.origin}
-            destination={selectedDestination}
-            apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
-            strokeWidth={4}
-            strokeColor="blue"
+          <>
+            {/* The Live API Engine runs ONLY once per new pin press selection */}
+            {!hasFetchedActiveRoute && (
+              <MapViewDirections
+                origin={currentRoute.origin}
+                destination={selectedDestination}
+                apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_KEY || ""}
+                strokeWidth={0} // Kept at 0 to hide it while calculating behind the scenes
+                strokeColor="transparent"
+                mode="DRIVING"
+                optimizeWaypoints={true}
+                {...(avoidTolls ? { avoid: ['tolls'] as any } : {})}
 
-            // tells google directions to actively recalculate when settings change
-            mode="DRIVING"
-            optimizeWaypoints={true}
-            {...(avoidTolls ? { avoid: ['tolls'] as any } : {})}
+                onReady={(result) => {
+                  // Permanently snapshot the geometry coordinates array right to cache
+                  setCachedCoordinates(result.coordinates);
+                  
+                  // SNAP THE LOCK SHUT: Instantly unmounts component from rendering engine tree
+                  setHasFetchedActiveRoute(true);
 
-           
+                  setRouteStats({
+                    // convert kilometers to freedom units
+                    distance: result.distance * 0.621372,
+                    duration: result.duration // minutes
+                  });
 
-            // listen for calculation response
-            onReady={(result) => {
-              setRouteStats({
-                // convert kilometers to freedom units
-                distance: result.distance * 0.621372,
-                duration: result.duration // minutes
-              });
+                  // make camera frame route coordinates dynamically
+                  if (mapRef.current) {
+                    mapRef.current.fitToCoordinates(result.coordinates, {
+                      edgePadding: {
+                        top: 340, // extra padding to clear buttons
+                        right: 120,
+                        bottom: 160, // extra padding on bottom to clear summary card
+                        left: 120,
+                      },
+                      animated: true, // smooth animation
+                    });
+                  }
+                }}
+                onError={(errorMessage) => {
+                  console.error("Directions Error: ", errorMessage);
+                  setHasFetchedActiveRoute(true); // Lock it anyway to prevent runaway rapid retry loop charges
+                }}
+              />
+            )}
 
-              // make camera frame the route coordinates dynamically
-              if (mapRef.current) {
-                mapRef.current.fitToCoordinates(result.coordinates, {
-                  edgePadding: {
-                    top: 340, //extra padding to clear buttons
-                    right: 120,
-                    bottom: 160, // extra padding on bottom to clear summary card
-                    left: 120,
-                  },
-                  animated: true, // smooth zoom animation
-                });
-              }
-            }}
-            onError={(errorMessage) => {
-              console.error("Directions Error: ", errorMessage);
-            }}
-          />
+            {/* local polyline fallback — Draws the line instantly from local storage memory for free */}
+            {cachedCoordinates && (
+              <Polyline
+                coordinates={cachedCoordinates}
+                strokeWidth={4}
+                strokeColor="blue"
+              />
+            )}
+          </>
         )}
       </MapView>
 
@@ -585,6 +613,9 @@ const shareWithExternalMap = () => {
             onPress={() => {
               setSelectedDestination(null);
               setRouteStats(null);
+
+              setCachedCoordinates(null);
+              setHasFetchedActiveRoute(false);
             }}
           >
             <Text style={styles.floatingButtonText}>❌</Text>
