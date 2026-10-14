@@ -5,7 +5,7 @@ module.exports = {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "reststops",
+    scheme: "reststopsapp",
     userInterfaceStyle: "automatic",
     ios: {
       icon: "./assets/expo.icon",

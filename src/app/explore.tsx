@@ -1,8 +1,10 @@
 
 
-import { Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Button, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFilters } from './_layout';
+
+import * as Linking from 'expo-linking';
 
 import { supabase } from '../../services/supabase';
 
@@ -36,6 +38,13 @@ export default function SettingsScreen() {
    const [authLoading, setAuthLoading] = useState<boolean>(false);
    
    const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
+
+   const [securityLoading, setSecurityLoading] = useState<boolean>(false);
+   const [totpSecretUrl, setTotpSecretUrl] = useState<string>('');
+   const [totpBackupCodes, setTotpBackupCodes] = useState<string[]>([]);
+   const [twoFactorCode, setTwoFactorCode] = useState<string>('');
+   const [is2FAEnabled, setIs2FAEnabled] = useState<boolean>(false);
+   const [show2FASetupModal, setShow2FASetupModal] = useState<boolean>(false);
 
    const BottomTabInset = 49;
    const Spacing = { three: 12, six: 24, four: 16 };
@@ -106,6 +115,72 @@ export default function SettingsScreen() {
   }
    };
 
+   // triggler account recovery password reset email link
+   const handleAccountRecovery = async () => {
+    if (!email) return Alert.alert("Email Required.", "Please type your email address into the input field above to request a recovery link.");
+
+    setSecurityLoading(true);
+
+    const recoveryLink = Linking.createURL('explore', { queryParams: { recoveryMode: 'true' } });
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: recoveryLink, // points to native app deep link
+    });
+    setSecurityLoading(false);
+
+    if (error) {
+      Alert.alert("Recovery Failed", error.message);
+    } else {
+      Alert.alert("Recovery Email Sent!", "Please check your email inbox for a secure link to reset your account password.");
+      setActiveAuthView('NONE');
+    }
+   };
+
+   // start 2FA auth registration config loop
+   const handleEnroll2FA = async () => {
+    setSecurityLoading(true);
+    try {
+      // calls supabase MFA API channel
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        issuer: 'RoadTripApp'
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        // this URL can be passed into a QR code generator element or typed manually into google authenticator
+        setTotpSecretUrl(data.totp.secret);
+        setShow2FASetupModal(true);
+      }
+    } catch (err: any) {
+      Alert.alert("MFA Setup Error", err.message);
+    } finally {
+      setSecurityLoading(false);
+    }
+   };
+
+   // verify six digit verification token to lock in 2FA safety gates
+   const handleVerify2FAToken = async (factorId: string) => {
+    if (twoFactorCode.length !== 6) return Alert.alert("Invalid Token", "Please enter a valid 6-digit confirmation code.");
+
+    setSecurityLoading(true);
+    const { data, error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: factorId,
+      code: twoFactorCode
+    });
+    setSecurityLoading(false);
+
+    if (error) {
+      Alert.alert("Verification Failed", error.message);
+    } else {
+      Alert.alert("2FA Secured?", "Two-Factor Authentication is officially active on your profile!");
+      setIs2FAEnabled(true);
+      setShow2FASetupModal(false);
+      setTwoFactorCode('');
+    }
+   };
+
    // disconnect user session tokens safely
    const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -140,7 +215,7 @@ export default function SettingsScreen() {
         
         {user ? (
           // render profile data stats and sign out
-          <View>
+          <View style={{ gap: 8 }}>
             <Text style={[styles.bodyText, isDarkMode && { color: '#bbb'}]}>👋 Welcome back!</Text>
             <Text style={styles.emailTextBadge}>{user.email}</Text>
             <View style={styles.row}>
@@ -154,14 +229,29 @@ export default function SettingsScreen() {
                 trackColor={{ false: '#767577', true: '#a855f7' }} //accent for premium feel (change color later)
                 thumbColor={isPremiumUser ? '#6b21a8' : '#f4f3f4'}
               />
+              </View>
+
+              <View style={[styles.securityStatusBox, isDarkMode && { backgroundColor:'#2a2a2a', borderColor: '#3a3a3a' }]}>
+                <Text style={[styles.securityTitle, isDarkMode && { color: '#fff' }]}>🔒 Account Security Configuration</Text>
+                <Text style={{ fontSize: 13, color: is2FAEnabled ? '#4caf50' : '#d9534f', fontWeight: '600', marginVertical: 4 }}>
+                  Status: {is2FAEnabled ? '🛡️ Two-Factor Auth Active' : '⚠️ 2FA Protection Disabled'}
+                </Text>
+
+                {securityLoading ? (
+                  <ActivityIndicator size="small" color="#1A53A0" style={{ marginTop: 6 }} />
+                ) : (
+                  !is2FAEnabled && (
+                    <Button title="Setup 2FA Authentication" color="#4caf50" onPress={handleEnroll2FA} />
+                  )
+                )}
             </View>
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 8, gap:8 }}>
               <Button
                 title="Sign Out of Profile"
                 color="#d9534f"
                 onPress={handleSignOut} />
             </View>
-          </View>
+            </View>
         ) : (
           // logged out view
           <View style={{ gap: 10 }}>
@@ -184,6 +274,8 @@ export default function SettingsScreen() {
               </View>
         </View>
         
+
+      
       </View>
     )}
   </View>
@@ -297,6 +389,27 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {activeAuthView === 'LOGIN' && (
+          <TouchableOpacity
+            style={{
+              alignSelf: 'flex-start',
+              marginTop: -4,
+              marginBottom: 8,
+              paddingVertical: 4
+            }}
+            onPress={handleAccountRecovery}
+          >
+            <Text style={{
+              color: '#1A53A0',
+              fontSize: 13,
+              fontWeight: '600',
+              textDecorationLine: 'underline'
+            }}>
+              Forgot Password or Need Recovery?
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {activeAuthView === 'SIGNUP' && (
           <View style={[styles.passwordInputContainer, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}>
             <TextInput
@@ -339,6 +452,50 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
+    )}
+
+    {/* 2FA popup Modal layer*/}
+    {show2FASetupModal && (
+      <View style={styles.authFullScreenModal}>
+        <Text style={[styles.modalTitle, { color: '#4caf50' }]}>🛡️ Configure 2FA Security</Text>
+        <Text style={[styles.modalSubtitle, isDarkMode && { color: '#aaa' }]}>
+          Copy the secret key text configuration token below, paste it into your device Authenticator App (Google Authenticator, etc.), and enter the 6-digit confirmation code below:
+        </Text>
+
+        <View style={{ padding: 12, backgroundColor: '#edf2f7', borderRadius: 8, marginVertical: 8 }}>
+          <Text selectable style={{
+            fontFamily: Platform.select({ ios: 'courier', android: 'monospace' }),
+            fontSize: 12,
+            color: '#2d3748',
+            textAlign: 'center' }}
+          >
+            {totpSecretUrl}
+          </Text>
+          </View>
+
+          <TextInput
+          style={[styles.inputBox, isDarkMode && { backgroundColor: '#222', borderColor: '#444', color: '#fff' }]}
+          placeholder="Enter 6-Digit Token Code"
+          placeholderTextColor="grey"
+          value={twoFactorCode}
+          onChangeText={setTwoFactorCode}
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+
+        <View style={{ gap: 10, marginTop: 12 }}>
+          <Button
+            title="Verify and Enable 2FA"
+            color="#4caf50"
+            onPress={() => handleVerify2FAToken('totp')}
+          />
+          <Button
+            title="Cancel Setup"
+            color="#666"
+            onPress={() => setShow2FASetupModal(false)}
+          />
+        </View>
+        </View>
     )}
     </View>
   );
@@ -491,5 +648,20 @@ const styles = StyleSheet.create({
 
     eyeIconText: {
       fontSize: 16,
+    },
+
+    securityStatusBox: {
+      backgroundColor: '#f7fafc',
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
+      borderRadius: 8,
+      padding: 12,
+      marginTop: 8,
+    },
+
+    securityTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#2d3748',
     },
 });

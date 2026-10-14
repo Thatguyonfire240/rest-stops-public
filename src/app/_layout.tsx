@@ -9,6 +9,8 @@ import { supabase } from '../../services/supabase';
 
 import AppTabs from '../components/app-tabs';
 
+import * as Linking from 'expo-linking';
+
 // init global shared filter contexts
 interface FilterContextType {
   showOnlyEv: boolean;
@@ -78,10 +80,56 @@ export default function TabLayout() {
     });
 
     // constant listening stream to update if user logs in, signs up etc
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+  });
+
+  const handleDeepLinkIncoming = async (url: string) => {
+    if (!url) return;
+    
+    // Parses out standard query string hashes
+    const parsed = Linking.parse(url);
+    
+    // Checks for recoveryMode flag parameter
+    if (parsed.queryParams?.recoveryMode === 'true' || url.includes('recovery')) {
+      // Extract the auth tokens straight out of the URL param string
+      const fragment = url.split('#')[1];
+      if (fragment) {
+        const params = new URLSearchParams(fragment);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          // Manually authenticate into profile session using the tokens
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+
+          if (!error) {
+            Alert.alert(
+              "Account Recovered! 🔑",
+              "You have been securely authenticated. Please use your profile settings dashboard to save a new password immediately.",
+              [{ text: "Open Settings" }]
+            );
+          }
+        }
+      }
+    }
+  };
+
+  // Listen for links firing while the app process is already open in the background
+  const linkListener = Linking.addEventListener('url', (event) => {
+    handleDeepLinkIncoming(event.url);
+  });
+
+  // Listen for links waking up a completely killed app process
+  Linking.getInitialURL().then((url) => {
+    if (url) handleDeepLinkIncoming(url);
+  });
+
+
 
     return () => subscription.unsubscribe();
   }, []);
