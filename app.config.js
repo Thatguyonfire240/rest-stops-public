@@ -6,6 +6,8 @@ module.exports = {
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "reststopsapp",
+
+
     userInterfaceStyle: "automatic",
     ios: {
       icon: "./assets/expo.icon",
@@ -14,7 +16,8 @@ module.exports = {
         NSLocationAlwaysAndWhenInUseUsageDescription: "Allow $(PRODUCT_NAME) to access your location to show nearby rest stops.",
         NSLocationAlwaysUsageDescription: "Allow $(PRODUCT_NAME) to access your location while you are not using the app.",
         UIBackgroundModes: ["location"]
-      }
+      },
+      "supportsTablet": true
     },
     android: {
       adaptiveIcon: {
@@ -61,7 +64,14 @@ module.exports = {
             "android.permission.ACCESS_BACKGROUND_LOCATION"
           ]
         }
-      ]
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
     ],
     experiments: {
       typedRoutes: true,
@@ -75,4 +85,6 @@ module.exports = {
     },
     owner: "thatguyonfire240"
   }
+
+   
 };

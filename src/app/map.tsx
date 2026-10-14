@@ -8,6 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { useFilters } from './_layout';
 
+import SafeAdBanner from '../components/SafeAdBanner';
+
+import { StatusBar } from 'expo-status-bar';
+
 
 // coordinate structure
 interface LocationCoordinates {
@@ -26,6 +30,16 @@ interface RouteContainer {
   origin: LocationCoordinates | null;
   destinations: LocationCoordinates[];
 }
+/*
+MobileAds()
+  .initialize()
+  .then(adapterStatuses => {
+    console.log('Google Mobile Ads SDK Initialized Successfully!');
+  })
+  .catch(err => console.log('AdMob initialization handled safely: ', err));
+  */
+
+  
 
 export default function App() {
 
@@ -354,6 +368,24 @@ const shareWithExternalMap = () => {
 
   return (
     <Animated.View style={[styles.container, { opacity: mapOpacity }]}>
+
+      {/* forces hardware status bar to use correct text color */}
+      <StatusBar
+        style={
+          isDarkMode
+            ? 'light' // dark mode active
+            : (!isPremiumUser ? 'dark' : 'auto') // free user light mode: forces text to dark grey over ad banner
+        }
+        animated={true}
+      />
+
+      {/* Insert Ad Banner */}
+      <SafeAdBanner
+        isPremiumUser={isPremiumUser}
+        isDarkMode={isDarkMode}
+        safeAreaTop={safeAreaInsets.top}
+      />
+
       {/* Render map using coordinates stored from variable */}
       <MapView
       // binds map to reference handle
@@ -545,7 +577,7 @@ const shareWithExternalMap = () => {
       {selectedDestination && (
         <View style={[
           styles.clearRouteWrapper,
-          { top: safeAreaInsets.top + 12 }
+          { top: safeAreaInsets.top + (!isPremiumUser ? 64 : 12) }
           ]}>
           <TouchableOpacity
             style={[styles.floatingActionCloseCircle, isDarkMode && { backgroundColor: '#222', borderColor: '#444' }]}
@@ -565,6 +597,8 @@ const shareWithExternalMap = () => {
         styles.bottomContainerWrapper,
         { bottom: safeAreaInsets.bottom + 16 }
         ]}>
+
+
         {loadingDatabase ? (
           <View style={styles.loadingDatabaseRow}>
             <ActivityIndicator size="small" color="#1A53A0" />
@@ -756,7 +790,7 @@ const styles = StyleSheet.create({
 
   clearRouteWrapper: {
     position: 'absolute',
-    left: 20,
+    left: 16,
     zIndex: 10,
   },
 
@@ -1006,5 +1040,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     width: '100%',
+  },
+
+  adBannerRowSlot: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 2,
+    marginBottom: 6,
+  },
+
+  topAdBannerRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingBottom: 4,
   },
 });
