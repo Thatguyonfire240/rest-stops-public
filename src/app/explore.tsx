@@ -217,18 +217,24 @@ export default function SettingsScreen() {
           // render profile data stats and sign out
           <View style={{ gap: 8 }}>
             <Text style={[styles.bodyText, isDarkMode && { color: '#bbb'}]}>👋 Welcome back!</Text>
-            <Text style={styles.emailTextBadge}>{user.email}</Text>
-            <View style={styles.row}>
-              <Text style={[styles.rowLabel, !user && { color: '#aaa' }, isDarkMode && { color: '#eee' }]}>
-                💎 Unlock Premium Features (Simulated)
-              </Text>
-              <Switch
-                value={isPremiumUser}
-                disabled={!user} // first locks behind needing to be logged in
-                onValueChange={(newValue) => setIsPremiumUser(newValue)}
-                trackColor={{ false: '#767577', true: '#a855f7' }} //accent for premium feel (change color later)
-                thumbColor={isPremiumUser ? '#6b21a8' : '#f4f3f4'}
-              />
+            <Text style={[styles.emailTextBadge, { alignSelf: 'flex-start' }]}>{user.email}</Text>
+              
+                <View style={{
+                  backgroundColor: isPremiumUser ? '#a855f7' : '#e2e8f0', // Purple accents if premium
+                  paddingVertical: 4,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  marginTop: 2,
+                  marginBottom: 4,
+                  alignSelf: 'flex-start'
+                }}>
+                  <Text style={{ 
+                    color: isPremiumUser ? 'white' : '#64748b', 
+                    fontWeight: 'bold', 
+                    fontSize: 12 
+                  }}>
+                    {isPremiumUser ? '💎 Premium Subscriber' : 'Standard Member'}
+                  </Text>
               </View>
 
               <View style={[styles.securityStatusBox, isDarkMode && { backgroundColor:'#2a2a2a', borderColor: '#3a3a3a' }]}>

@@ -71,6 +71,52 @@ export default function TabLayout() {
   // hook for premium user handling, init as false
   const [isPremiumUser, setIsPremiumUser] = useState<boolean>(false);
 
+  // listens for sign ins and pulls premium status
+  useEffect(() => {
+    if (!user) {
+      setIsPremiumUser(false); //default to locked if not logged in
+      return;
+    }
+
+    const checkPremiumDatabasePoint = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_premium')
+        .eq('id', user.id)
+        .single(); // grabs singular atching profile row
+
+      if (!error && data) {
+        setIsPremiumUser(data.is_premium); // set premium status strictly based on database records
+      }
+    };
+
+    checkPremiumDatabasePoint();
+
+    const realtimeChannel = supabase
+      .channel('live-profile-tracker')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          // if you change checkbox in browser editor this fires live
+          if (payload.new && 'is_premium' in payload.new) {
+            setIsPremiumUser(payload.new.is_premium);
+          }
+        }
+      )
+      .subscribe();
+
+      return () => {
+        supabase.removeChannel(realtimeChannel);
+      };
+
+  }, [user]); // re runs whenever a login, logout or session change occurs
+
   // init background listener to watch for auth
   useEffect(() => {
     // pull init login session immediately on application launch
@@ -80,7 +126,7 @@ export default function TabLayout() {
     });
 
     // constant listening stream to update if user logs in, signs up etc
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_authEvent, session) => {
     setSession(session);
     setUser(session?.user ?? null);
   });
@@ -131,7 +177,10 @@ export default function TabLayout() {
 
 
 
-    return () => subscription.unsubscribe();
+    return () =>  {
+      subscription.unsubscribe();
+      linkListener.remove();
+    };
   }, []);
 
   // pull user faves from database
